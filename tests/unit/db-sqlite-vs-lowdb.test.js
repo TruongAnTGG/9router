@@ -65,6 +65,38 @@ describe("DB SQLite layer — public API parity", () => {
     expect(await sqliteDb.getApiKeyById(k.id)).toBeNull();
   });
 
+  it("apiKeys: reset window starts on first API call after reset", async () => {
+    const k = await sqliteDb.createApiKey("quota-key", "machine-abc", {
+      tokenLimit: 100,
+      resetHours: 1,
+    });
+    expect(k.cycleStartedAt).toBeNull();
+
+    expect(await sqliteDb.validateApiKey(k.key)).toBe(true);
+    const started = await sqliteDb.getApiKeyById(k.id);
+    expect(started.cycleStartedAt).toBeTruthy();
+    expect(started.resetAt).toBeTruthy();
+
+    await sqliteDb.recordApiKeyUsage(k.key, { prompt_tokens: 40, completion_tokens: 5 });
+    const used = await sqliteDb.getApiKeyById(k.id);
+    expect(used.usedTokens).toBe(45);
+
+    const oldCycleStart = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+    await sqliteDb.updateApiKey(k.id, { usedTokens: 80, cycleStartedAt: oldCycleStart });
+
+    const passivelyReset = await sqliteDb.getApiKeyById(k.id);
+    expect(passivelyReset.usedTokens).toBe(0);
+    expect(passivelyReset.cycleStartedAt).toBeNull();
+    expect(passivelyReset.resetAt).toBeNull();
+
+    expect(await sqliteDb.validateApiKey(k.key)).toBe(true);
+    const restarted = await sqliteDb.getApiKeyById(k.id);
+    expect(restarted.cycleStartedAt).toBeTruthy();
+    expect(new Date(restarted.cycleStartedAt).getTime()).toBeGreaterThan(new Date(oldCycleStart).getTime());
+
+    await sqliteDb.deleteApiKey(k.id);
+  });
+
   it("providerConnections: CRUD + reorder by priority", async () => {
     const c1 = await sqliteDb.createProviderConnection({ provider: "test", authType: "apikey", name: "a", apiKey: "k1" });
     const c2 = await sqliteDb.createProviderConnection({ provider: "test", authType: "apikey", name: "b", apiKey: "k2" });

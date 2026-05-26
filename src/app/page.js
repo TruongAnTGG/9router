@@ -1,7 +1,8 @@
-// Auto-initialize cloud sync when server starts
-import "@/lib/initCloudSync";
-import { redirect } from "next/navigation";
+import LakeTokenLanding from "./LakeTokenLanding";
 
-export default function InitPage() {
-  redirect('/dashboard');
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+export default function HomePage() {
+  return <LakeTokenLanding />;
 }

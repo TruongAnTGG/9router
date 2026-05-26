@@ -119,6 +119,13 @@ export async function handleChatCore({ body, modelInfo, credentials, log, onCred
     log?.debug?.("CAVEMAN", `${cavemanLevel} | ${finalFormat}`);
   }
 
+  // Ask OpenAI-compatible streaming providers to include a final usage chunk.
+  // Some clients do not send this option, which otherwise leaves API-key quotas
+  // dependent on the fallback estimator.
+  if (stream && targetFormat === FORMATS.OPENAI && !translatedBody.stream_options) {
+    translatedBody.stream_options = { include_usage: true };
+  }
+
   const executor = getExecutor(provider);
   trackPendingRequest(model, provider, connectionId, true);
   appendRequestLog({ model, provider, connectionId, status: "PENDING" }).catch(() => {});

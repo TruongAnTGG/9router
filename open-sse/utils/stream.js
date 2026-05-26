@@ -235,7 +235,7 @@ export function createSSEStream(options = {}) {
 
             // Inject estimated usage if finish chunk has no valid usage
             const isFinishChunk = item.type === "message_delta" || item.choices?.[0]?.finish_reason;
-            if (state.finishReason && isFinishChunk && !hasValidUsage(item.usage) && totalContentLength > 0) {
+            if (state.finishReason && isFinishChunk && !hasValidUsage(item.usage)) {
               const estimated = estimateUsage(body, totalContentLength, sourceFormat);
               item.usage = filterUsageForFormat(estimated, sourceFormat); // Filter + already has buffer
               state.usage = estimated;
@@ -269,7 +269,7 @@ export function createSSEStream(options = {}) {
             controller.enqueue(sharedEncoder.encode(output));
           }
 
-          if (!hasValidUsage(usage) && totalContentLength > 0) {
+          if (!hasValidUsage(usage)) {
             usage = estimateUsage(body, totalContentLength, FORMATS.OPENAI);
           }
 
@@ -339,7 +339,7 @@ export function createSSEStream(options = {}) {
         reqLogger?.appendConvertedChunk?.(doneOutput);
         controller.enqueue(sharedEncoder.encode(doneOutput));
 
-        if (!hasValidUsage(state?.usage) && totalContentLength > 0) {
+        if (!hasValidUsage(state?.usage)) {
           state.usage = estimateUsage(body, totalContentLength, sourceFormat);
         }
 

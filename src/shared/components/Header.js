@@ -106,7 +106,7 @@ const getPageInfo = (pathname) => {
   if (pathname.includes("/mitm"))
     return {
       title: "MITM Proxy",
-      description: "Intercept CLI tool traffic and route through 9Router",
+      description: "Intercept CLI tool traffic and route through LakeToken",
       icon: "security",
       breadcrumbs: [],
     };
@@ -127,7 +127,7 @@ const getPageInfo = (pathname) => {
   if (pathname.includes("/skills"))
     return {
       title: "Agent Skills",
-      description: "Copy a link and paste to your AI to use 9Router — no install needed",
+      description: "Copy a link and paste to your AI to use LakeToken — no install needed",
       icon: "extension",
       breadcrumbs: [],
     };
@@ -136,6 +136,13 @@ const getPageInfo = (pathname) => {
       title: "Endpoint",
       description: "API endpoint configuration",
       icon: "api",
+      breadcrumbs: [],
+    };
+  if (pathname.includes("/api-keys"))
+    return {
+      title: "API Keys",
+      description: "Issue keys, enforce access policy, and manage token quotas",
+      icon: "vpn_key",
       breadcrumbs: [],
     };
   if (pathname.includes("/profile"))

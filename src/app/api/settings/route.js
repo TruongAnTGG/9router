@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { getSettings, updateSettings } from "@/lib/localDb";
 import { applyOutboundProxyEnv } from "@/lib/network/outboundProxy";
 import { resetComboRotation } from "open-sse/services/combo.js";
@@ -10,6 +11,17 @@ export const revalidate = 0;
 const SETTINGS_RESPONSE_HEADERS = {
   "Cache-Control": "no-store"
 };
+
+const LANDING_CONTACT_KEYS = [
+  "landingContactName",
+  "landingContactEmail",
+  "landingContactPhone",
+  "landingContactZalo",
+  "landingContactTelegram",
+  "landingContactUrl",
+  "landingContactCtaLabel",
+  "landingPricingPlans",
+];
 
 export async function GET() {
   try {
@@ -88,6 +100,11 @@ export async function PATCH(request) {
       Object.prototype.hasOwnProperty.call(body, "comboStrategies")
     ) {
       resetComboRotation();
+    }
+
+    if (LANDING_CONTACT_KEYS.some((key) => Object.prototype.hasOwnProperty.call(body, key))) {
+      revalidatePath("/");
+      revalidatePath("/landing");
     }
 
     const { password, oidcClientSecret, ...safeSettings } = settings;

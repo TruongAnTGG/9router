@@ -280,6 +280,14 @@ export async function saveRequestUsage(entry) {
     });
 
     pushToRing(entry);
+    if (entry.apiKey) {
+      try {
+        const { recordApiKeyUsage } = await import("./apiKeysRepo.js");
+        await recordApiKeyUsage(entry.apiKey, tokens);
+      } catch (e) {
+        console.error("Failed to update API key quota:", e);
+      }
+    }
     statsEmitter.emit("update");
   } catch (e) {
     console.error("Failed to save usage stats:", e);

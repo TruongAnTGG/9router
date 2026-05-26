@@ -29,8 +29,15 @@ export {
 
 // API keys
 export {
-  getApiKeys, getApiKeyById, createApiKey, updateApiKey, deleteApiKey, validateApiKey,
+  getApiKeys, getApiKeyById, createApiKey, updateApiKey, deleteApiKey,
+  validateApiKey, validateApiKeyDetailed, recordApiKeyUsage,
+  getApiKeyUsageSummaryByKey,
 } from "./repos/apiKeysRepo.js";
+
+// Customer leads
+export {
+  createCustomerLead, getCustomerLeads, updateCustomerLeadStatus,
+} from "./repos/customerLeadsRepo.js";
 
 // Combos
 export {
@@ -77,7 +84,18 @@ export async function exportDb() {
     providerConnections: db.all(`SELECT * FROM providerConnections`).map((r) => ({ ...parseJson(r.data, {}), id: r.id, provider: r.provider, authType: r.authType, name: r.name, email: r.email, priority: r.priority, isActive: r.isActive === 1, createdAt: r.createdAt, updatedAt: r.updatedAt })),
     providerNodes: db.all(`SELECT * FROM providerNodes`).map((r) => ({ ...parseJson(r.data, {}), id: r.id, type: r.type, name: r.name, createdAt: r.createdAt, updatedAt: r.updatedAt })),
     proxyPools: db.all(`SELECT * FROM proxyPools`).map((r) => ({ ...parseJson(r.data, {}), id: r.id, isActive: r.isActive === 1, testStatus: r.testStatus, createdAt: r.createdAt, updatedAt: r.updatedAt })),
-    apiKeys: db.all(`SELECT * FROM apiKeys`).map((r) => ({ id: r.id, key: r.key, name: r.name, machineId: r.machineId, isActive: r.isActive === 1, createdAt: r.createdAt })),
+    apiKeys: db.all(`SELECT * FROM apiKeys`).map((r) => ({
+      id: r.id, key: r.key, name: r.name, machineId: r.machineId, isActive: r.isActive === 1,
+      tokenLimit: r.tokenLimit || 0, resetHours: r.resetHours || 0, usedTokens: r.usedTokens || 0,
+      cycleStartedAt: r.cycleStartedAt || null, expiresAt: r.expiresAt || null,
+      createdAt: r.createdAt, updatedAt: r.updatedAt || null,
+    })),
+    customerLeads: db.all(`SELECT * FROM customerLeads`).map((r) => ({
+      id: r.id, name: r.name, email: r.email, phone: r.phone, company: r.company,
+      packageName: r.packageName, tokenVolume: r.tokenVolume, budget: r.budget,
+      message: r.message, status: r.status, source: r.source,
+      createdAt: r.createdAt, updatedAt: r.updatedAt || null,
+    })),
     combos: db.all(`SELECT * FROM combos`).map((r) => ({ id: r.id, name: r.name, kind: r.kind, models: parseJson(r.models, []), createdAt: r.createdAt, updatedAt: r.updatedAt })),
     modelAliases: {},
     customModels: [],
@@ -106,6 +124,7 @@ export async function importDb(payload) {
     db.run(`DELETE FROM providerNodes`);
     db.run(`DELETE FROM proxyPools`);
     db.run(`DELETE FROM apiKeys`);
+    db.run(`DELETE FROM customerLeads`);
     db.run(`DELETE FROM combos`);
     db.run(`DELETE FROM kv WHERE scope IN ('modelAliases', 'customModels', 'mitmAlias', 'pricing')`);
 
@@ -137,8 +156,24 @@ export async function importDb(payload) {
     }
     for (const k of payload.apiKeys || []) {
       db.run(
-        `INSERT OR REPLACE INTO apiKeys(id, key, name, machineId, isActive, createdAt) VALUES(?, ?, ?, ?, ?, ?)`,
-        [k.id, k.key, k.name || null, k.machineId || null, k.isActive === false ? 0 : 1, k.createdAt || new Date().toISOString()]
+        `INSERT OR REPLACE INTO apiKeys(id, key, name, machineId, isActive, tokenLimit, resetHours, usedTokens, cycleStartedAt, expiresAt, createdAt, updatedAt) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          k.id, k.key, k.name || null, k.machineId || null, k.isActive === false ? 0 : 1,
+          k.tokenLimit || 0, k.resetHours || 0, k.usedTokens || 0, k.cycleStartedAt || k.createdAt || new Date().toISOString(),
+          k.expiresAt || null, k.createdAt || new Date().toISOString(), k.updatedAt || new Date().toISOString(),
+        ]
+      );
+    }
+    for (const lead of payload.customerLeads || []) {
+      db.run(
+        `INSERT OR REPLACE INTO customerLeads(id, name, email, phone, company, packageName, tokenVolume, budget, message, status, source, createdAt, updatedAt)
+         VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          lead.id, lead.name || "Unknown", lead.email || "", lead.phone || "", lead.company || "",
+          lead.packageName || "", lead.tokenVolume || "", lead.budget || "", lead.message || "",
+          lead.status || "new", lead.source || "import", lead.createdAt || new Date().toISOString(),
+          lead.updatedAt || new Date().toISOString(),
+        ]
       );
     }
     for (const c of payload.combos || []) {

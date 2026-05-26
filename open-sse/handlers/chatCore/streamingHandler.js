@@ -2,7 +2,7 @@ import { FORMATS } from "../../translator/formats.js";
 import { needsTranslation } from "../../translator/index.js";
 import { createSSETransformStreamWithLogger, createPassthroughStreamWithLogger } from "../../utils/stream.js";
 import { pipeWithDisconnect } from "../../utils/streamHandler.js";
-import { buildRequestDetail, extractRequestConfig, saveUsageStats } from "./requestDetail.js";
+import { buildRequestDetail, extractRequestConfig } from "./requestDetail.js";
 import { saveRequestDetail } from "@/lib/usageDb.js";
 
 const SSE_HEADERS = {
@@ -92,7 +92,8 @@ export function buildOnStreamComplete({ provider, model, connectionId, apiKey, r
       console.error("[RequestDetail] Failed to update streaming content:", err.message);
     });
 
-    saveUsageStats({ provider, model, tokens: usage, connectionId, apiKey, endpoint: clientRawRequest?.endpoint, label: "STREAM USAGE" });
+    // Stream usage is persisted by the SSE transform via logUsage(). Avoid a
+    // second save here, otherwise API-key quotas and usage history double count.
   };
 
   return { onStreamComplete, streamDetailId };

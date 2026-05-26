@@ -7,7 +7,7 @@
 .fonts-loaded .material-symbols-outlined { visibility: visible; }
 
 /* ============================================================
-   9Router palette — adopted from 9remote_private/web
+   LakeToken palette — adopted from 9remote_private/web
    Brand orange (dark) / soft coral (light), neutral warm bases
    ============================================================ */
 :root {
@@ -207,6 +207,10 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+.overflow-wrap-anywhere {
+  overflow-wrap: anywhere;
+}
+
 /* Selection - brand-tinted */
 ::selection {
   background-color: rgba(229, 106, 74, 0.25);
@@ -215,6 +219,95 @@ body {
 .dark ::selection {
   background-color: rgba(229, 106, 74, 0.3);
   color: var(--color-brand-300);
+}
+
+/* Landing page motion */
+.landing-aurora {
+  background:
+    radial-gradient(circle at 26% 18%, rgba(229, 106, 74, 0.3), transparent 32%),
+    radial-gradient(circle at 78% 24%, rgba(59, 130, 246, 0.18), transparent 30%),
+    linear-gradient(180deg, rgba(16, 18, 20, 0), rgba(16, 18, 20, 0.72));
+  animation: landingAurora 12s ease-in-out infinite alternate;
+}
+
+.landing-grid-motion {
+  background-image:
+    linear-gradient(rgba(255,255,255,0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.045) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: linear-gradient(to bottom, transparent, black 18%, black 72%, transparent);
+  animation: landingGridDrift 18s linear infinite;
+}
+
+.landing-float {
+  animation: landingFloat 6s ease-in-out infinite;
+}
+
+.landing-route-pulse {
+  animation: landingRoute 2.4s ease-in-out infinite;
+}
+
+.landing-flow-dot {
+  animation: landingFlowDot 2.6s ease-in-out infinite;
+}
+
+.landing-provider-card,
+.landing-price-card,
+.landing-feature-card {
+  animation: landingRise 700ms ease-out both;
+}
+
+.landing-provider-card:nth-child(2) { animation-delay: 80ms; }
+.landing-provider-card:nth-child(3) { animation-delay: 160ms; }
+.landing-provider-card:nth-child(4) { animation-delay: 240ms; }
+.landing-provider-card:nth-child(5) { animation-delay: 320ms; }
+.landing-provider-card:nth-child(6) { animation-delay: 400ms; }
+
+@keyframes landingAurora {
+  from { transform: scale(1) translate3d(0, 0, 0); filter: saturate(1); }
+  to { transform: scale(1.06) translate3d(1.5%, -1%, 0); filter: saturate(1.12); }
+}
+
+@keyframes landingGridDrift {
+  from { background-position: 0 0; }
+  to { background-position: 44px 44px; }
+}
+
+@keyframes landingFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+@keyframes landingRoute {
+  from { left: -6rem; opacity: 0; }
+  18% { opacity: 1; }
+  82% { opacity: 1; }
+  to { left: 100%; opacity: 0; }
+}
+
+@keyframes landingFlowDot {
+  from { left: 0; opacity: 0; }
+  15% { opacity: 1; }
+  85% { opacity: 1; }
+  to { left: 100%; opacity: 0; }
+}
+
+@keyframes landingRise {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-aurora,
+  .landing-grid-motion,
+  .landing-float,
+  .landing-route-pulse,
+  .landing-flow-dot,
+  .landing-provider-card,
+  .landing-price-card,
+  .landing-feature-card {
+    animation: none;
+  }
 }
 
 /* iOS keyboard accent */

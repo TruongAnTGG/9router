@@ -11,8 +11,18 @@ export class DefaultExecutor extends BaseExecutor {
     super(provider, PROVIDERS[provider] || PROVIDERS.openai);
   }
 
-  transformRequest(model, body) {
-    return injectReasoningContent({ provider: this.provider, model, body });
+  transformRequest(model, body, stream) {
+    let next = injectReasoningContent({ provider: this.provider, model, body });
+
+    const isAnthropicCompatible = this.provider?.startsWith?.("anthropic-compatible-");
+    const isOpenAICompatible = this.provider?.startsWith?.("openai-compatible-");
+    const isOpenAIChatLike = !isAnthropicCompatible && (isOpenAICompatible || this.config?.format === "openai");
+
+    if (stream && isOpenAIChatLike && next?.messages && !next.stream_options) {
+      next = { ...next, stream_options: { include_usage: true } };
+    }
+
+    return next;
   }
 
   buildUrl(model, stream, urlIndex = 0, credentials = null) {

@@ -1,8 +1,8 @@
 export default function manifest() {
   return {
-    name: '9Router - AI Infrastructure Management',
-    short_name: '9Router',
-    description: 'One endpoint for all your AI providers. Manage keys, monitor usage, and scale effortlessly.',
+    name: 'LakeToken - AI Token Packages',
+    short_name: 'LakeToken',
+    description: 'Sell AI token packages with API key delivery and customer balance pages.',
     start_url: '/',
     display: 'standalone',
     background_color: '#0a0a0a',

@@ -19,13 +19,14 @@ export default function Navigation() {
           <div className="size-8 rounded bg-linear-to-br from-[#f97815] to-orange-700 flex items-center justify-center text-white">
             <span className="material-symbols-outlined text-[20px]">hub</span>
           </div>
-          <h2 className="text-white text-xl font-bold tracking-tight">9Router</h2>
+          <h2 className="text-white text-xl font-bold tracking-tight">LakeToken</h2>
         </button>
 
         {/* Desktop menu */}
         <div className="hidden md:flex items-center gap-8">
           <a className="text-gray-300 hover:text-white text-sm font-medium transition-colors" href="#features">Features</a>
           <a className="text-gray-300 hover:text-white text-sm font-medium transition-colors" href="#how-it-works">How it Works</a>
+          <a className="text-gray-300 hover:text-white text-sm font-medium transition-colors" href="/api-key-check">API Key Check</a>
           <a className="text-gray-300 hover:text-white text-sm font-medium transition-colors" href="https://github.com/decolua/9router#readme" target="_blank" rel="noopener noreferrer">Docs</a>
           <a className="text-gray-300 hover:text-white text-sm font-medium transition-colors flex items-center gap-1" href="https://github.com/decolua/9router" target="_blank" rel="noopener noreferrer">
             GitHub <span className="material-symbols-outlined text-[14px]">open_in_new</span>
@@ -55,6 +56,7 @@ export default function Navigation() {
           <div className="flex flex-col gap-4 p-6">
             <a className="text-gray-300 hover:text-white text-sm font-medium transition-colors" href="#features" onClick={() => setMobileMenuOpen(false)}>Features</a>
             <a className="text-gray-300 hover:text-white text-sm font-medium transition-colors" href="#how-it-works" onClick={() => setMobileMenuOpen(false)}>How it Works</a>
+            <a className="text-gray-300 hover:text-white text-sm font-medium transition-colors" href="/api-key-check" onClick={() => setMobileMenuOpen(false)}>API Key Check</a>
             <a className="text-gray-300 hover:text-white text-sm font-medium transition-colors" href="https://github.com/decolua/9router#readme" target="_blank" rel="noopener noreferrer">Docs</a>
             <a className="text-gray-300 hover:text-white text-sm font-medium transition-colors" href="https://github.com/decolua/9router" target="_blank" rel="noopener noreferrer">GitHub</a>
             <button 
@@ -69,4 +71,3 @@ export default function Navigation() {
     </nav>
   );
 }
-

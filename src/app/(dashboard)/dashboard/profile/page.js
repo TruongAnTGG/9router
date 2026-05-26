@@ -6,6 +6,53 @@ import { useTheme } from "@/shared/hooks/useTheme";
 import { cn } from "@/shared/utils/cn";
 import { APP_CONFIG } from "@/shared/constants/config";
 
+const DEFAULT_LANDING_PRICING_PLANS = [
+  {
+    name: "100K Tokens",
+    price: "$19",
+    period: "/pack",
+    description: "Starter token package for testing and small apps.",
+    badge: "",
+    highlighted: false,
+    cta: "Buy tokens",
+    features: ["100K AI tokens", "API key included", "Usage check page", "Basic support"],
+  },
+  {
+    name: "1M Tokens",
+    price: "$59",
+    period: "/pack",
+    description: "Best value for teams and customer-facing apps.",
+    badge: "Popular",
+    highlighted: true,
+    cta: "Buy package",
+    features: ["1M AI tokens", "Customer API key", "Live quota page", "Priority support"],
+  },
+  {
+    name: "Custom Supply",
+    price: "Custom",
+    period: "",
+    description: "Bulk token supply for agencies, SaaS, and resellers.",
+    badge: "Enterprise",
+    highlighted: false,
+    cta: "Request quote",
+    features: ["Bulk token volume", "Custom quota rules", "Dedicated integration", "SLA options"],
+  },
+];
+
+function normalizeLandingPricingPlans(value) {
+  const source = Array.isArray(value) && value.length > 0 ? value : DEFAULT_LANDING_PRICING_PLANS;
+  return source.map((plan) => ({
+    name: plan?.name || "",
+    price: plan?.price || "",
+    period: plan?.period || "",
+    description: plan?.description || "",
+    badge: plan?.badge || "",
+    highlighted: plan?.highlighted === true,
+    cta: plan?.cta || "Contact sales",
+    features: Array.isArray(plan?.features) ? plan.features : [],
+  }));
+}
+
 export default function ProfilePage() {
   const { theme, setTheme, isDark } = useTheme();
   const [settings, setSettings] = useState({ fallbackStrategy: "fill-first" });
@@ -38,6 +85,18 @@ export default function ProfilePage() {
   const [proxyStatus, setProxyStatus] = useState({ type: "", message: "" });
   const [proxyLoading, setProxyLoading] = useState(false);
   const [proxyTestLoading, setProxyTestLoading] = useState(false);
+  const [landingForm, setLandingForm] = useState({
+    landingContactName: "",
+    landingContactEmail: "",
+    landingContactPhone: "",
+    landingContactZalo: "",
+    landingContactTelegram: "",
+    landingContactUrl: "",
+    landingContactCtaLabel: "Contact sales",
+    landingPricingPlans: DEFAULT_LANDING_PRICING_PLANS,
+  });
+  const [landingStatus, setLandingStatus] = useState({ type: "", message: "" });
+  const [landingLoading, setLandingLoading] = useState(false);
 
   useEffect(() => {
     fetch("/api/settings")
@@ -58,6 +117,16 @@ export default function ProfilePage() {
           outboundProxyUrl: data?.outboundProxyUrl || "",
           outboundNoProxy: data?.outboundNoProxy || "",
         });
+        setLandingForm({
+          landingContactName: data?.landingContactName || "",
+          landingContactEmail: data?.landingContactEmail || "",
+          landingContactPhone: data?.landingContactPhone || "",
+          landingContactZalo: data?.landingContactZalo || "",
+          landingContactTelegram: data?.landingContactTelegram || "",
+          landingContactUrl: data?.landingContactUrl || "",
+          landingContactCtaLabel: data?.landingContactCtaLabel || "Contact sales",
+          landingPricingPlans: normalizeLandingPricingPlans(data?.landingPricingPlans),
+        });
         setLoading(false);
       })
       .catch((err) => {
@@ -68,7 +137,9 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      setOidcRedirectUri(`${window.location.origin}/api/auth/oidc/callback`);
+      queueMicrotask(() => {
+        setOidcRedirectUri(`${window.location.origin}/api/auth/oidc/callback`);
+      });
     }
   }, []);
 
@@ -99,6 +170,65 @@ export default function ProfilePage() {
       setProxyStatus({ type: "error", message: "An error occurred" });
     } finally {
       setProxyLoading(false);
+    }
+  };
+
+  const updateLandingForm = (key, value) => {
+    setLandingForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const updateLandingPlan = (index, key, value) => {
+    setLandingForm((prev) => ({
+      ...prev,
+      landingPricingPlans: normalizeLandingPricingPlans(prev.landingPricingPlans).map((plan, i) => (
+        i === index ? { ...plan, [key]: value } : plan
+      )),
+    }));
+  };
+
+  const updateLandingPlanFeatures = (index, value) => {
+    updateLandingPlan(index, "features", value.split("\n").map((item) => item.trim()).filter(Boolean));
+  };
+
+  const addLandingPlan = () => {
+    setLandingForm((prev) => ({
+      ...prev,
+      landingPricingPlans: [
+        ...normalizeLandingPricingPlans(prev.landingPricingPlans),
+        { name: "New token pack", price: "$99", period: "/pack", description: "", badge: "", highlighted: false, cta: "Buy tokens", features: ["AI tokens", "API key", "Usage dashboard"] },
+      ],
+    }));
+  };
+
+  const removeLandingPlan = (index) => {
+    setLandingForm((prev) => ({
+      ...prev,
+      landingPricingPlans: normalizeLandingPricingPlans(prev.landingPricingPlans).filter((_, i) => i !== index),
+    }));
+  };
+
+  const saveLandingContact = async (e) => {
+    e.preventDefault();
+    setLandingLoading(true);
+    setLandingStatus({ type: "", message: "" });
+
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(landingForm),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSettings((prev) => ({ ...prev, ...data }));
+        setLandingStatus({ type: "success", message: "Landing page settings saved" });
+      } else {
+        setLandingStatus({ type: "error", message: data.error || "Failed to save landing contact" });
+      }
+    } catch (err) {
+      setLandingStatus({ type: "error", message: "An error occurred" });
+    } finally {
+      setLandingLoading(false);
     }
   };
 
@@ -591,6 +721,189 @@ export default function ProfilePage() {
               </p>
             )}
           </div>
+        </Card>
+
+        {/* Landing Contact */}
+        <Card>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 rounded-lg bg-primary/10 text-primary shrink-0">
+              <span className="material-symbols-outlined text-[20px]">contact_page</span>
+            </div>
+            <div>
+              <h3 className="text-base sm:text-lg font-semibold">Landing Contact</h3>
+              <p className="text-xs text-text-muted">Shown on the public LakeToken landing page.</p>
+            </div>
+          </div>
+          <form onSubmit={saveLandingContact} className="flex flex-col gap-4">
+            <Input
+              label="Display name"
+              placeholder="LakeToken Sales"
+              value={landingForm.landingContactName}
+              onChange={(e) => updateLandingForm("landingContactName", e.target.value)}
+              disabled={loading || landingLoading}
+            />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Input
+                label="Email"
+                type="email"
+                placeholder="sales@example.com"
+                value={landingForm.landingContactEmail}
+                onChange={(e) => updateLandingForm("landingContactEmail", e.target.value)}
+                disabled={loading || landingLoading}
+              />
+              <Input
+                label="Phone"
+                placeholder="+84..."
+                value={landingForm.landingContactPhone}
+                onChange={(e) => updateLandingForm("landingContactPhone", e.target.value)}
+                disabled={loading || landingLoading}
+              />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Input
+                label="Zalo link"
+                placeholder="https://zalo.me/..."
+                value={landingForm.landingContactZalo}
+                onChange={(e) => updateLandingForm("landingContactZalo", e.target.value)}
+                disabled={loading || landingLoading}
+              />
+              <Input
+                label="Telegram"
+                placeholder="@username or https://t.me/username"
+                value={landingForm.landingContactTelegram}
+                onChange={(e) => updateLandingForm("landingContactTelegram", e.target.value)}
+                disabled={loading || landingLoading}
+              />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Input
+                label="Primary contact URL"
+                placeholder="https://example.com/contact"
+                value={landingForm.landingContactUrl}
+                onChange={(e) => updateLandingForm("landingContactUrl", e.target.value)}
+                disabled={loading || landingLoading}
+              />
+              <Input
+                label="CTA label"
+                placeholder="Contact sales"
+                value={landingForm.landingContactCtaLabel}
+                onChange={(e) => updateLandingForm("landingContactCtaLabel", e.target.value)}
+                disabled={loading || landingLoading}
+              />
+            </div>
+            <div className="border-t border-border/50 pt-4">
+              <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h4 className="text-sm font-semibold text-text-main">Pricing plans</h4>
+                  <p className="text-xs text-text-muted">Shown as plan cards on the landing page.</p>
+                </div>
+                <Button type="button" variant="outline" icon="add" onClick={addLandingPlan} disabled={loading || landingLoading} className="w-full sm:w-auto">
+                  Add plan
+                </Button>
+              </div>
+              <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+                {normalizeLandingPricingPlans(landingForm.landingPricingPlans).map((plan, index) => (
+                  <div key={`${plan.name}-${index}`} className="rounded-[12px] border border-border-subtle bg-bg p-4">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <div className="flex size-9 items-center justify-center rounded-full bg-primary/10 text-primary">
+                          <span className="material-symbols-outlined text-[18px]">token</span>
+                        </div>
+                        <div className="text-sm font-semibold">Plan {index + 1}</div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <label className="flex items-center gap-2 text-xs text-text-muted">
+                          <input
+                            type="checkbox"
+                            checked={plan.highlighted}
+                            onChange={(e) => updateLandingPlan(index, "highlighted", e.target.checked)}
+                            disabled={loading || landingLoading}
+                          />
+                          Featured
+                        </label>
+                        {normalizeLandingPricingPlans(landingForm.landingPricingPlans).length > 1 ? (
+                          <button
+                            type="button"
+                            onClick={() => removeLandingPlan(index)}
+                            disabled={loading || landingLoading}
+                            className="flex size-8 items-center justify-center rounded-full text-text-muted hover:bg-surface-2 hover:text-red-500 disabled:opacity-50"
+                            aria-label="Remove pricing plan"
+                          >
+                            <span className="material-symbols-outlined text-[18px]">delete</span>
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 gap-3">
+                      <Input
+                        label="Name"
+                        value={plan.name}
+                        onChange={(e) => updateLandingPlan(index, "name", e.target.value)}
+                        disabled={loading || landingLoading}
+                      />
+                      <div className="grid grid-cols-2 gap-3">
+                        <Input
+                          label="Price"
+                          value={plan.price}
+                          onChange={(e) => updateLandingPlan(index, "price", e.target.value)}
+                          disabled={loading || landingLoading}
+                        />
+                        <Input
+                          label="Period"
+                          placeholder="/mo"
+                          value={plan.period}
+                          onChange={(e) => updateLandingPlan(index, "period", e.target.value)}
+                          disabled={loading || landingLoading}
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <Input
+                          label="Badge"
+                          placeholder="Popular"
+                          value={plan.badge}
+                          onChange={(e) => updateLandingPlan(index, "badge", e.target.value)}
+                          disabled={loading || landingLoading}
+                        />
+                        <Input
+                          label="CTA"
+                          value={plan.cta}
+                          onChange={(e) => updateLandingPlan(index, "cta", e.target.value)}
+                          disabled={loading || landingLoading}
+                        />
+                      </div>
+                      <Input
+                        label="Description"
+                        value={plan.description}
+                        onChange={(e) => updateLandingPlan(index, "description", e.target.value)}
+                        disabled={loading || landingLoading}
+                      />
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-sm font-medium text-text-main">Features</label>
+                        <textarea
+                          rows={5}
+                          value={(plan.features || []).join("\n")}
+                          onChange={(e) => updateLandingPlanFeatures(index, e.target.value)}
+                          disabled={loading || landingLoading}
+                          className="w-full resize-y rounded-[10px] border border-transparent bg-surface-2 px-3 py-2.5 text-[16px] text-text-main placeholder-text-muted/70 transition-all duration-150 ease-out focus:border-brand-500/40 focus:outline-none focus:ring-2 focus:ring-brand-500/30 disabled:cursor-not-allowed disabled:opacity-50 sm:text-sm"
+                        />
+                        <p className="text-xs text-text-muted">One feature per line.</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 pt-2 border-t border-border/50">
+              <Button type="submit" variant="primary" loading={landingLoading} className="w-full sm:w-auto">
+                Save landing page
+              </Button>
+              {landingStatus.message && (
+                <p className={`text-xs sm:text-sm ${landingStatus.type === "error" ? "text-red-500" : "text-green-500"}`}>
+                  {landingStatus.message}
+                </p>
+              )}
+            </div>
+          </form>
         </Card>
 
         {/* Security */}

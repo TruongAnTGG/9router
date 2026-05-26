@@ -3,6 +3,39 @@ import { parseJson, stringifyJson } from "../helpers/jsonCol.js";
 
 const DEFAULT_MITM_ROUTER_BASE = "http://localhost:20128";
 
+const DEFAULT_LANDING_PRICING_PLANS = [
+  {
+    name: "100K Tokens",
+    price: "$19",
+    period: "/pack",
+    description: "Starter token package for testing and small apps.",
+    badge: "",
+    highlighted: false,
+    cta: "Buy tokens",
+    features: ["100K AI tokens", "API key included", "Usage check page", "Basic support"],
+  },
+  {
+    name: "1M Tokens",
+    price: "$59",
+    period: "/pack",
+    description: "Best value for teams and customer-facing apps.",
+    badge: "Popular",
+    highlighted: true,
+    cta: "Buy package",
+    features: ["1M AI tokens", "Customer API key", "Live quota page", "Priority support"],
+  },
+  {
+    name: "Custom Supply",
+    price: "Custom",
+    period: "",
+    description: "Bulk token supply for agencies, SaaS, and resellers.",
+    badge: "Enterprise",
+    highlighted: false,
+    cta: "Request quote",
+    features: ["Bulk token volume", "Custom quota rules", "Dedicated integration", "SLA options"],
+  },
+];
+
 const DEFAULT_SETTINGS = {
   cloudEnabled: false,
   tunnelEnabled: false,
@@ -36,6 +69,14 @@ const DEFAULT_SETTINGS = {
   rtkEnabled: true,
   cavemanEnabled: false,
   cavemanLevel: "full",
+  landingContactName: "",
+  landingContactEmail: "",
+  landingContactPhone: "",
+  landingContactZalo: "",
+  landingContactTelegram: "",
+  landingContactUrl: "",
+  landingContactCtaLabel: "Contact sales",
+  landingPricingPlans: DEFAULT_LANDING_PRICING_PLANS,
 };
 
 async function readRaw() {
