@@ -31,8 +31,13 @@ export {
 export {
   getApiKeys, getApiKeyById, createApiKey, updateApiKey, deleteApiKey,
   validateApiKey, validateApiKeyDetailed, recordApiKeyUsage,
-  getApiKeyUsageSummaryByKey,
+  getApiKeyUsageSummaryByKey, updateApiKeySelectedModelByKey,
 } from "./repos/apiKeysRepo.js";
+
+export {
+  getSkills, getSkillById, getSkillBySlug,
+  createSkill, updateSkill, deleteSkill,
+} from "./repos/skillsRepo.js";
 
 // Customer leads
 export {
@@ -53,6 +58,18 @@ export {
 } from "./repos/aliasRepo.js";
 
 // Pricing
+
+// Token packages
+export {
+  getTokenPackages, getTokenPackageById,
+  createTokenPackage, updateTokenPackage, deleteTokenPackage,
+} from "./repos/tokenPackagesRepo.js";
+
+// Orders
+export {
+  getOrders, getOrderById, createOrder,
+  updateOrderStatus, completeOrderAndGrantTokens, revokeOrderPurchasedTokens, getOrderStats, deleteOrder,
+} from "./repos/ordersRepo.js";
 export {
   getPricing, getPricingForModel, updatePricing, resetPricing, resetAllPricing,
 } from "./repos/pricingRepo.js";
@@ -87,9 +104,13 @@ export async function exportDb() {
     apiKeys: db.all(`SELECT * FROM apiKeys`).map((r) => ({
       id: r.id, key: r.key, name: r.name, machineId: r.machineId, isActive: r.isActive === 1,
       tokenLimit: r.tokenLimit || 0, resetHours: r.resetHours || 0, usedTokens: r.usedTokens || 0,
-      cycleStartedAt: r.cycleStartedAt || null, expiresAt: r.expiresAt || null,
+      purchasedTokenLimit: r.purchasedTokenLimit || 0, usedPurchasedTokens: r.usedPurchasedTokens || 0,
+      purchasedExpiresAt: r.purchasedExpiresAt || null,
+      cycleStartedAt: r.cycleStartedAt || null, comboName: r.comboName || null,
+      selectedModel: r.selectedModel || null, skillIds: parseJson(r.skillIds, []), expiresAt: r.expiresAt || null,
       createdAt: r.createdAt, updatedAt: r.updatedAt || null,
     })),
+    skills: db.all(`SELECT * FROM skills`).map((r) => ({ id: r.id, isActive: r.isActive === 1, ...parseJson(r.data, {}), createdAt: r.createdAt, updatedAt: r.updatedAt })),
     customerLeads: db.all(`SELECT * FROM customerLeads`).map((r) => ({
       id: r.id, name: r.name, email: r.email, phone: r.phone, company: r.company,
       packageName: r.packageName, tokenVolume: r.tokenVolume, budget: r.budget,
@@ -124,6 +145,7 @@ export async function importDb(payload) {
     db.run(`DELETE FROM providerNodes`);
     db.run(`DELETE FROM proxyPools`);
     db.run(`DELETE FROM apiKeys`);
+    db.run(`DELETE FROM skills`);
     db.run(`DELETE FROM customerLeads`);
     db.run(`DELETE FROM combos`);
     db.run(`DELETE FROM kv WHERE scope IN ('modelAliases', 'customModels', 'mitmAlias', 'pricing')`);
@@ -156,12 +178,22 @@ export async function importDb(payload) {
     }
     for (const k of payload.apiKeys || []) {
       db.run(
-        `INSERT OR REPLACE INTO apiKeys(id, key, name, machineId, isActive, tokenLimit, resetHours, usedTokens, cycleStartedAt, expiresAt, createdAt, updatedAt) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT OR REPLACE INTO apiKeys(id, key, name, machineId, isActive, tokenLimit, resetHours, usedTokens, purchasedTokenLimit, usedPurchasedTokens, purchasedExpiresAt, cycleStartedAt, comboName, selectedModel, skillIds, expiresAt, createdAt, updatedAt) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           k.id, k.key, k.name || null, k.machineId || null, k.isActive === false ? 0 : 1,
-          k.tokenLimit || 0, k.resetHours || 0, k.usedTokens || 0, k.cycleStartedAt || k.createdAt || new Date().toISOString(),
-          k.expiresAt || null, k.createdAt || new Date().toISOString(), k.updatedAt || new Date().toISOString(),
+          k.tokenLimit || 0, k.resetHours || 0, k.usedTokens || 0,
+          k.purchasedTokenLimit || 0, k.usedPurchasedTokens || 0, k.purchasedExpiresAt || null,
+          k.cycleStartedAt || k.createdAt || new Date().toISOString(),
+          k.comboName || null, k.selectedModel || null, stringifyJson(k.skillIds || []), k.expiresAt || null,
+          k.createdAt || new Date().toISOString(), k.updatedAt || new Date().toISOString(),
         ]
+      );
+    }
+    for (const s of payload.skills || []) {
+      const { id, isActive, createdAt, updatedAt, ...data } = s;
+      db.run(
+        `INSERT OR REPLACE INTO skills(id, isActive, data, createdAt, updatedAt) VALUES(?, ?, ?, ?, ?)`,
+        [id, isActive === false ? 0 : 1, stringifyJson(data), createdAt || new Date().toISOString(), updatedAt || new Date().toISOString()]
       );
     }
     for (const lead of payload.customerLeads || []) {

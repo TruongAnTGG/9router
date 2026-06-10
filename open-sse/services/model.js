@@ -31,6 +31,7 @@ const ALIAS_TO_PROVIDER_ID = {
   commandcode: "commandcode",
   groq: "groq",
   xai: "xai",
+  "xai-build": "xai-build",
   mistral: "mistral",
   pplx: "perplexity",
   perplexity: "perplexity",

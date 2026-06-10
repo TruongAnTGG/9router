@@ -145,6 +145,20 @@ const getPageInfo = (pathname) => {
       icon: "vpn_key",
       breadcrumbs: [],
     };
+  if (pathname.includes("/buy-tokens"))
+    return {
+      title: "Buy Tokens",
+      description: "Purchase extra tokens for API keys",
+      icon: "shopping_cart",
+      breadcrumbs: [],
+    };
+  if (pathname.includes("/token-packages"))
+    return {
+      title: "Token Packages",
+      description: "Configure token packages and pricing",
+      icon: "token",
+      breadcrumbs: [],
+    };
   if (pathname.includes("/profile"))
     return {
       title: "Settings",

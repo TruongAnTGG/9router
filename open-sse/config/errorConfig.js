@@ -45,6 +45,7 @@ export const MAX_RATE_LIMIT_COOLDOWN_MS = 30 * 60 * 1000;
 const COOLDOWN = {
   long: 2 * 60 * 1000,
   short: 5 * 1000,
+  suspicious: 30 * 60 * 1000,
 };
 
 /**
@@ -61,6 +62,8 @@ export const ERROR_RULES = [
   { text: "no credentials",           cooldownMs: COOLDOWN.long },
   { text: "request not allowed",      cooldownMs: COOLDOWN.short },
   { text: "improperly formed request", cooldownMs: COOLDOWN.long },
+  { text: "suspicious activity",      cooldownMs: COOLDOWN.suspicious },
+  { text: "temporary limits",         cooldownMs: COOLDOWN.suspicious },
   { text: "rate limit",               backoff: true },
   { text: "too many requests",        backoff: true },
   { text: "quota exceeded",           backoff: true },

@@ -18,6 +18,8 @@ const COMBINED_WEB_ITEM = { id: "web", label: "Web Fetch & Search", icon: "trave
 const navItems = [
   { href: "/dashboard/endpoint", label: "Endpoint", icon: "api" },
   { href: "/dashboard/api-keys", label: "API Keys", icon: "vpn_key" },
+  { href: "/dashboard/buy-tokens", label: "Buy Tokens", icon: "shopping_cart" },
+  { href: "/dashboard/token-packages", label: "Token Packages", icon: "token" },
   { href: "/dashboard/customer-leads", label: "Customer Leads", icon: "assignment" },
   { href: "/dashboard/providers", label: "Providers", icon: "dns" },
   // { href: "/dashboard/basic-chat", label: "Basic Chat", icon: "chat" }, // Hidden

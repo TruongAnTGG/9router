@@ -51,6 +51,18 @@ function pickNumber(...values) {
   return undefined;
 }
 
+function pickBoolean(...values) {
+  for (const value of values) {
+    if (typeof value === "boolean") return value;
+    if (typeof value === "string") {
+      const normalized = value.trim().toLowerCase();
+      if (normalized === "true") return true;
+      if (normalized === "false") return false;
+    }
+  }
+  return undefined;
+}
+
 function looksLikeChatGptCookie(value) {
   if (typeof value !== "string") return false;
   return (
@@ -149,30 +161,67 @@ export function normalizeCodexImport(input = {}) {
     accountInfo.email,
     accessInfo.email
   );
+  const name = pickString(input.name, input.displayName, source.name, source.displayName, email);
+  const priority = pickNumber(input.priority, source.priority);
+  const isActive = pickBoolean(input.isActive, input.is_active, source.isActive, source.is_active);
   const expiresIn = pickNumber(input.expiresIn, input.expires_in, source.expiresIn, source.expires_in, nestedTokens.expiresIn, nestedTokens.expires_in);
-  const explicitExpiresAt = pickString(input.expiresAt, input.expires_at, source.expiresAt, source.expires_at, source.expires, nestedTokens.expiresAt, nestedTokens.expires_at);
+  const explicitExpiresAt = pickString(
+    input.expiresAt,
+    input.expires_at,
+    input.expired,
+    source.expiresAt,
+    source.expires_at,
+    source.expires,
+    source.expired,
+    nestedTokens.expiresAt,
+    nestedTokens.expires_at,
+    nestedTokens.expired
+  );
   const tokenType = pickString(input.tokenType, input.token_type, source.tokenType, source.token_type, nestedTokens.tokenType, nestedTokens.token_type);
   const scope = pickString(input.scope, source.scope, nestedTokens.scope);
   const chatgptAccountId = pickString(
     input.chatgptAccountId,
+    input.account_id,
+    input.providerSpecificData?.chatgptAccountId,
+    input.providerSpecificData?.chatgpt_account_id,
     source.chatgptAccountId,
     source.chatgpt_account_id,
+    source.account_id,
+    source.providerSpecificData?.chatgptAccountId,
+    source.providerSpecificData?.chatgpt_account_id,
     nestedTokens.chatgptAccountId,
     nestedTokens.chatgpt_account_id,
+    nestedTokens.account_id,
     accountInfo.chatgptAccountId,
     source.account?.id,
     accessInfo.chatgptAccountId
   );
   const chatgptPlanType = pickString(
     input.chatgptPlanType,
+    input.plan_type,
+    input.providerSpecificData?.chatgptPlanType,
+    input.providerSpecificData?.chatgpt_plan_type,
     source.chatgptPlanType,
     source.chatgpt_plan_type,
+    source.plan_type,
+    source.providerSpecificData?.chatgptPlanType,
+    source.providerSpecificData?.chatgpt_plan_type,
     nestedTokens.chatgptPlanType,
     nestedTokens.chatgpt_plan_type,
+    nestedTokens.plan_type,
     accountInfo.chatgptPlanType,
     source.account?.planType,
     accessInfo.chatgptPlanType
   );
+  const sessionToken = pickString(
+    input.sessionToken,
+    input.session_token,
+    source.sessionToken,
+    source.session_token,
+    nestedTokens.sessionToken,
+    nestedTokens.session_token
+  );
+  const idTokenSynthetic = input.idTokenSynthetic ?? input.id_token_synthetic ?? source.idTokenSynthetic ?? source.id_token_synthetic;
 
   const connection = {
     provider: "codex",
@@ -182,21 +231,26 @@ export function normalizeCodexImport(input = {}) {
 
   if (accessToken) connection.accessToken = accessToken;
   if (refreshToken) connection.refreshToken = refreshToken;
-  if (expiresIn) {
-    connection.expiresIn = expiresIn;
+  if (expiresIn) connection.expiresIn = expiresIn;
+  if (explicitExpiresAt && !Number.isNaN(new Date(explicitExpiresAt).getTime())) {
+    connection.expiresAt = new Date(explicitExpiresAt).toISOString();
+  } else if (expiresIn) {
     connection.expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
   } else if (accessInfo.expiresAt) {
     connection.expiresAt = accessInfo.expiresAt;
-  } else if (explicitExpiresAt && !Number.isNaN(new Date(explicitExpiresAt).getTime())) {
-    connection.expiresAt = new Date(explicitExpiresAt).toISOString();
   }
   if (tokenType) connection.tokenType = tokenType;
   if (scope) connection.scope = scope;
+  if (name) connection.name = name;
   if (email) connection.email = email;
+  if (priority !== undefined) connection.priority = priority;
+  if (isActive !== undefined) connection.isActive = isActive;
 
   const providerSpecificData = {};
   if (chatgptAccountId) providerSpecificData.chatgptAccountId = chatgptAccountId;
   if (chatgptPlanType) providerSpecificData.chatgptPlanType = chatgptPlanType;
+  if (sessionToken) providerSpecificData.sessionToken = sessionToken;
+  if (idTokenSynthetic !== undefined) providerSpecificData.idTokenSynthetic = !!idTokenSynthetic;
   if (!refreshToken && accessToken) providerSpecificData.importMode = "chatgpt_session_access_token";
   if (Object.keys(providerSpecificData).length) {
     connection.providerSpecificData = providerSpecificData;

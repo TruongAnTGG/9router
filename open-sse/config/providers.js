@@ -190,7 +190,7 @@ export const PROVIDERS = {
   kiro: {
     baseUrl: "https://codewhisperer.us-east-1.amazonaws.com/generateAssistantResponse",
     format: "kiro",
-    retry: { 429: 2 },
+    retry: { 429: 0 },
     headers: {
       "Content-Type": "application/json",
       "Accept": "application/vnd.amazon.eventstream",
@@ -269,6 +269,10 @@ export const PROVIDERS = {
   xai: {
     baseUrl: "https://api.x.ai/v1/chat/completions",
     format: "openai"
+  },
+  "xai-build": {
+    baseUrl: "https://api.x.ai/v1/responses",
+    format: "openai-responses"
   },
   mistral: {
     baseUrl: "https://api.mistral.ai/v1/chat/completions",

@@ -6,6 +6,7 @@ import { getMeta, setMeta } from "../helpers/metaStore.js";
 const PENDING_TIMEOUT_MS = 60 * 1000;
 const RING_CAP = 50;
 const CONN_CACHE_TTL_MS = 30 * 1000;
+const API_KEY_CACHE_TTL_MS = 30 * 1000;
 const PERIOD_MS = { "24h": 86400000, "7d": 604800000, "30d": 2592000000, "60d": 5184000000 };
 
 // In-memory state shared across Next.js modules
@@ -18,12 +19,14 @@ if (!global._statsEmitter) {
 if (!global._pendingTimers) global._pendingTimers = {};
 if (!global._recentRing) global._recentRing = { items: [], initialized: false };
 if (!global._connectionMapCache) global._connectionMapCache = { map: {}, ts: 0 };
+if (!global._apiKeyMapCache) global._apiKeyMapCache = { map: {}, ts: 0 };
 
 const pendingRequests = global._pendingRequests;
 const lastErrorProvider = global._lastErrorProvider;
 const pendingTimers = global._pendingTimers;
 const recentRing = global._recentRing;
 const connCache = global._connectionMapCache;
+const apiKeyCache = global._apiKeyMapCache;
 
 export const statsEmitter = global._statsEmitter;
 
@@ -94,6 +97,19 @@ async function getConnectionMapCached() {
     connCache.ts = Date.now();
   } catch {}
   return connCache.map;
+}
+
+async function getApiKeyMapCached() {
+  if (Date.now() - apiKeyCache.ts < API_KEY_CACHE_TTL_MS) return apiKeyCache.map;
+  try {
+    const { getApiKeys } = await import("./apiKeysRepo.js");
+    const all = await getApiKeys();
+    const map = {};
+    for (const k of all) map[k.key] = { name: k.name, id: k.id, createdAt: k.createdAt };
+    apiKeyCache.map = map;
+    apiKeyCache.ts = Date.now();
+  } catch {}
+  return apiKeyCache.map;
 }
 
 async function ensureRingInitialized() {
@@ -198,6 +214,7 @@ export function trackPendingRequest(model, provider, connectionId, started, erro
 export async function getActiveRequests() {
   const activeRequests = [];
   const connectionMap = await getConnectionMapCached();
+  const apiKeyMap = await getApiKeyMapCached();
 
   for (const [connectionId, models] of Object.entries(pendingRequests.byAccount)) {
     for (const [modelKey, count] of Object.entries(models)) {
@@ -219,11 +236,17 @@ export async function getActiveRequests() {
     .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
     .map((e) => {
       const t = e.tokens || {};
+      const keyInfo = e.apiKey ? apiKeyMap[e.apiKey] : null;
+      const keyName = e.apiKey
+        ? (keyInfo?.name || `${e.apiKey.slice(0, 8)}...`)
+        : "Local (No API Key)";
       return {
         timestamp: e.timestamp, model: e.model, provider: e.provider || "",
         promptTokens: t.prompt_tokens || t.input_tokens || 0,
         completionTokens: t.completion_tokens || t.output_tokens || 0,
         status: e.status || "ok",
+        apiKey: e.apiKey || null,
+        keyName,
       };
     })
     .filter((e) => {
@@ -350,16 +373,22 @@ export async function getUsageStats(period = "all") {
   for (const k of allApiKeys) apiKeyMap[k.key] = { name: k.name, id: k.id, createdAt: k.createdAt };
 
   // recentRequests from live history (last 100 entries enough for 20 deduped)
-  const recentRows = db.all(`SELECT timestamp, provider, model, tokens, status FROM usageHistory ORDER BY id DESC LIMIT 100`);
+  const recentRows = db.all(`SELECT timestamp, provider, model, apiKey, tokens, status FROM usageHistory ORDER BY id DESC LIMIT 100`);
   const seen = new Set();
   const recentRequests = recentRows
     .map((r) => {
       const t = parseJson(r.tokens, {}) || {};
+      const keyInfo = r.apiKey ? apiKeyMap[r.apiKey] : null;
+      const keyName = r.apiKey
+        ? (keyInfo?.name || `${r.apiKey.slice(0, 8)}...`)
+        : "Local (No API Key)";
       return {
         timestamp: r.timestamp, model: r.model, provider: r.provider || "",
         promptTokens: t.prompt_tokens || t.input_tokens || 0,
         completionTokens: t.completion_tokens || t.output_tokens || 0,
         status: r.status || "ok",
+        apiKey: r.apiKey || null,
+        keyName,
       };
     })
     .filter((e) => {

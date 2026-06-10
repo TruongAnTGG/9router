@@ -282,6 +282,11 @@ export function buildProviderHeaders(provider, credentials, stream = true, body 
       }
   
       case "codex":
+        headers["Authorization"] = `Bearer ${credentials.apiKey || credentials.accessToken}`;
+        if (credentials.providerSpecificData?.chatgptAccountId) {
+          headers["chatgpt-account-id"] = credentials.providerSpecificData.chatgptAccountId;
+        }
+        break;
       case "qwen":
       case "openai":
       case "openrouter":

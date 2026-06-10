@@ -21,7 +21,7 @@ export async function PUT(request, { params }) {
   try {
     const { id } = await params;
     const body = await request.json();
-    const { name, isActive, tokenLimit, resetHours, expiresAt, resetUsage } = body;
+    const { name, isActive, tokenLimit, resetHours, expiresAt, resetUsage, comboName, selectedModel, skillIds } = body;
 
     const existing = await getApiKeyById(id);
     if (!existing) {
@@ -35,6 +35,9 @@ export async function PUT(request, { params }) {
     if (resetHours !== undefined) updateData.resetHours = resetHours;
     if (expiresAt !== undefined) updateData.expiresAt = expiresAt;
     if (resetUsage !== undefined) updateData.resetUsage = !!resetUsage;
+    if (comboName !== undefined) updateData.comboName = comboName;
+    if (selectedModel !== undefined) updateData.selectedModel = selectedModel;
+    if (skillIds !== undefined) updateData.skillIds = Array.isArray(skillIds) ? skillIds : [];
 
     const updated = await updateApiKey(id, updateData);
 

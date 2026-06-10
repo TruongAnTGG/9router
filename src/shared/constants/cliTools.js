@@ -106,6 +106,31 @@ export const CLI_TOOLS = {
     description: "OpenAI Codex CLI",
     configType: "custom",
   },
+  grok: {
+    id: "grok",
+    name: "Grok Build",
+    icon: "terminal",
+    color: "#111827",
+    description: "xAI Grok Build CLI",
+    configType: "guide",
+    defaultCommand: "grok",
+    defaultModels: [
+      { id: "grok-build-0.1", name: "Grok Build 0.1", alias: "grok-build-0.1", defaultValue: "xai-build/grok-build-0.1" },
+    ],
+    guideSteps: [
+      { step: 1, title: "Install Grok", desc: "curl -fsSL https://x.ai/cli/install.sh | bash" },
+      { step: 2, title: "API Key", type: "apiKeySelector" },
+      { step: 3, title: "Base URL", value: "{{baseUrl}}", copyable: true },
+      { step: 4, title: "Select Model", type: "modelSelector" },
+      { step: 5, title: "Export Env", desc: "Set env vars before running Grok Build." },
+    ],
+    codeBlock: {
+      language: "bash",
+      code: `export OPENAI_API_KEY="{{apiKey}}"
+export OPENAI_BASE_URL="{{baseUrl}}"
+grok --model "{{model}}"`,
+    },
+  },
   opencode: {
     id: "opencode",
     name: "OpenCode",
@@ -328,4 +353,3 @@ export const getProviderModelsForMapping = (providers) => {
   });
   return result;
 };
-

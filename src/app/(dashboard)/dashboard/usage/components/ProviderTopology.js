@@ -105,18 +105,18 @@ const nodeTypes = { provider: ProviderNode, router: RouterNode };
 
 // Place N nodes evenly along an ellipse around the router center.
 function buildLayout(providers, activeSet, lastSet, errorSet) {
-  const nodeW = 180;
-  const nodeH = 30;
-  const routerW = 120;
-  const routerH = 44;
-  const nodeGap = 24;
+  const nodeW = 190;
+  const nodeH = 56;
+  const routerW = 140;
+  const routerH = 52;
+  const nodeGap = 52;
 
   const count = providers.length;
 
   // Compute rx so arc spacing between nodes >= nodeW + nodeGap
   const minRx = ((nodeW + nodeGap) * count) / (2 * Math.PI);
-  const rx = Math.max(320, minRx);
-  const ry = Math.max(200, rx * 0.55); // ellipse ratio ~0.55
+  const rx = Math.max(380, minRx);
+  const ry = Math.max(250, rx * 0.68);
   if (count === 0) {
     return {
       nodes: [{ id: "router", type: "router", position: { x: 0, y: 0 }, data: { activeCount: 0 }, draggable: false }],
@@ -278,7 +278,7 @@ export default function ProviderTopology({ providers = [], activeRequests = [], 
   }, [nodes.length]);
 
   return (
-    <div ref={containerRef} className="h-[320px] w-full min-w-0 rounded-lg border border-border bg-bg-subtle/30 sm:h-[480px]">
+    <div ref={containerRef} className="h-[420px] w-full min-w-0 rounded-lg border border-border bg-bg-subtle/30 sm:h-[560px] xl:h-[640px]">
       {providers.length === 0 ? (
         <div className="h-full flex items-center justify-center text-text-muted text-sm">
           No providers connected

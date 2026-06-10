@@ -60,6 +60,7 @@ describe("normalizeCodexImport", () => {
     expect(result.providerSpecificData).toEqual({
       chatgptAccountId: "account-from-session",
       chatgptPlanType: "free",
+      sessionToken: "encrypted-session-token",
       importMode: "chatgpt_session_access_token",
     });
   });
@@ -68,5 +69,109 @@ describe("normalizeCodexImport", () => {
     expect(() => normalizeCodexImport({
       session: "__Secure-next-auth.session-token=secret",
     })).toThrow("ChatGPT browser cookies cannot be imported");
+  });
+
+  it("normalizes a Codex auth bundle exported from ChatGPT account data", () => {
+    const accessToken = makeJwt({
+      exp: 1780627883,
+      "https://api.openai.com/auth": {
+        chatgpt_account_id: "account-from-access",
+        chatgpt_plan_type: "free",
+      },
+      "https://api.openai.com/profile": {
+        email: "access@example.com",
+      },
+    });
+    const idToken = makeJwt({
+      email: "id@example.com",
+      "https://api.openai.com/auth": {
+        chatgpt_account_id: "account-from-id",
+        chatgpt_plan_type: "free",
+      },
+    });
+
+    const result = normalizeCodexImport({
+      type: "codex",
+      account_id: "79a67681-edd0-499b-b4fa-103cbba1acba",
+      chatgpt_account_id: "79a67681-edd0-499b-b4fa-103cbba1acba",
+      email: "codex@example.com",
+      name: "codex@example.com",
+      plan_type: "free",
+      chatgpt_plan_type: "free",
+      id_token: idToken,
+      access_token: accessToken,
+      refresh_token: "",
+      session_token: "encrypted-session-token",
+      last_refresh: "2026-05-26T02:53:42.052912+00:00",
+      expired: "2026-06-05T02:51:23+00:00",
+      id_token_synthetic: true,
+    });
+
+    expect(result.provider).toBe("codex");
+    expect(result.authType).toBe("oauth");
+    expect(result.testStatus).toBe("active");
+    expect(result.accessToken).toBe(accessToken);
+    expect(result.refreshToken).toBeUndefined();
+    expect(result.email).toBe("codex@example.com");
+    expect(result.expiresAt).toBe("2026-06-05T02:51:23.000Z");
+    expect(result.providerSpecificData).toEqual({
+      chatgptAccountId: "79a67681-edd0-499b-b4fa-103cbba1acba",
+      chatgptPlanType: "free",
+      sessionToken: "encrypted-session-token",
+      idTokenSynthetic: true,
+      importMode: "chatgpt_session_access_token",
+    });
+  });
+
+  it("normalizes an already-shaped Codex account session for DB import", () => {
+    const accessToken = makeJwt({
+      exp: 1780634967,
+      "https://api.openai.com/auth": {
+        chatgpt_account_id: "account-from-access",
+        chatgpt_plan_type: "free",
+      },
+      "https://api.openai.com/profile": {
+        email: "access@example.com",
+      },
+    });
+
+    const result = normalizeCodexImport({
+      accessToken,
+      refreshToken: "refresh",
+      expiresAt: "2026-06-05T04:49:27.017Z",
+      testStatus: "active",
+      expiresIn: 864000,
+      providerSpecificData: {
+        chatgptAccountId: "account-from-provider-data",
+        chatgptPlanType: "free",
+      },
+      id: "existing-id",
+      provider: "codex",
+      authType: "oauth",
+      name: "codex@example.com",
+      email: "codex@example.com",
+      priority: 3,
+      isActive: true,
+      createdAt: "2026-05-26T04:49:27.017Z",
+      updatedAt: "2026-05-26T04:49:27.017Z",
+    });
+
+    expect(result).toMatchObject({
+      provider: "codex",
+      authType: "oauth",
+      accessToken,
+      refreshToken: "refresh",
+      expiresAt: "2026-06-05T04:49:27.017Z",
+      testStatus: "active",
+      expiresIn: 864000,
+      name: "codex@example.com",
+      email: "codex@example.com",
+      priority: 3,
+      isActive: true,
+      providerSpecificData: {
+        chatgptAccountId: "account-from-provider-data",
+        chatgptPlanType: "free",
+      },
+    });
   });
 });

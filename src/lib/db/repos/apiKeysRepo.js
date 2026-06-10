@@ -1,11 +1,20 @@
 import { v4 as uuidv4 } from "uuid";
 import { getAdapter } from "../driver.js";
+import { parseJson, stringifyJson } from "../helpers/jsonCol.js";
+
+function normalizeSkillIds(value) {
+  if (!Array.isArray(value)) return [];
+  return value.map((item) => String(item || "").trim()).filter(Boolean);
+}
 
 function rowToKey(row) {
   if (!row) return null;
   const tokenLimit = Number(row.tokenLimit || 0);
   const resetHours = Number(row.resetHours || 0);
   const usedTokens = Number(row.usedTokens || 0);
+  const purchasedTokenLimit = Number(row.purchasedTokenLimit || 0);
+  const usedPurchasedTokens = Number(row.usedPurchasedTokens || 0);
+  const purchasedExpiresAt = row.purchasedExpiresAt || null;
   const cycleStartedAt = row.cycleStartedAt || null;
   const resetAt = resetHours > 0 && cycleStartedAt
     ? new Date(new Date(cycleStartedAt).getTime() + resetHours * 60 * 60 * 1000).toISOString()
@@ -19,8 +28,14 @@ function rowToKey(row) {
     tokenLimit,
     resetHours,
     usedTokens,
+    purchasedTokenLimit,
+    usedPurchasedTokens,
+    purchasedExpiresAt,
     cycleStartedAt,
     resetAt,
+    comboName: row.comboName || null,
+    selectedModel: row.selectedModel || null,
+    skillIds: normalizeSkillIds(parseJson(row.skillIds, [])),
     expiresAt: row.expiresAt || null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt || null,
@@ -31,7 +46,12 @@ function getKeyStatus(apiKey) {
   if (!apiKey) return "not_found";
   if (!apiKey.isActive) return "inactive";
   if (apiKey.expiresAt && Date.now() >= new Date(apiKey.expiresAt).getTime()) return "expired";
-  if (apiKey.tokenLimit > 0 && apiKey.usedTokens >= apiKey.tokenLimit) return "quota_exceeded";
+  const baseRemaining = Math.max(0, Number(apiKey.tokenLimit || 0) - Number(apiKey.usedTokens || 0));
+  const purchasedValid = !apiKey.purchasedExpiresAt || Date.now() < new Date(apiKey.purchasedExpiresAt).getTime();
+  const purchasedRemaining = purchasedValid
+    ? Math.max(0, Number(apiKey.purchasedTokenLimit || 0) - Number(apiKey.usedPurchasedTokens || 0))
+    : 0;
+  if (baseRemaining <= 0 && purchasedRemaining <= 0) return "quota_exceeded";
   return "active";
 }
 
@@ -109,16 +129,22 @@ export async function createApiKey(name, machineId, options = {}) {
     machineId,
     isActive: true,
     tokenLimit: toNonNegativeInt(options.tokenLimit),
+    purchasedTokenLimit: 0,
+    usedPurchasedTokens: 0,
+    purchasedExpiresAt: null,
     resetHours: toNonNegativeInt(options.resetHours),
     usedTokens: 0,
     cycleStartedAt: null,
+    comboName: normalizeOptionalString(options.comboName),
+    selectedModel: normalizeOptionalString(options.selectedModel),
+    skillIds: normalizeSkillIds(options.skillIds),
     expiresAt: normalizeDate(options.expiresAt),
     createdAt: now,
     updatedAt: now,
   };
   db.run(
-    `INSERT INTO apiKeys(id, key, name, machineId, isActive, tokenLimit, resetHours, usedTokens, cycleStartedAt, expiresAt, createdAt, updatedAt) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [apiKey.id, apiKey.key, apiKey.name, apiKey.machineId, 1, apiKey.tokenLimit, apiKey.resetHours, apiKey.usedTokens, apiKey.cycleStartedAt, apiKey.expiresAt, apiKey.createdAt, apiKey.updatedAt]
+    `INSERT INTO apiKeys(id, key, name, machineId, isActive, tokenLimit, resetHours, usedTokens, purchasedTokenLimit, usedPurchasedTokens, purchasedExpiresAt, cycleStartedAt, comboName, selectedModel, skillIds, expiresAt, createdAt, updatedAt) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [apiKey.id, apiKey.key, apiKey.name, apiKey.machineId, 1, apiKey.tokenLimit, apiKey.resetHours, apiKey.usedTokens, apiKey.purchasedTokenLimit, apiKey.usedPurchasedTokens, apiKey.purchasedExpiresAt, apiKey.cycleStartedAt, apiKey.comboName, apiKey.selectedModel, stringifyJson(apiKey.skillIds), apiKey.expiresAt, apiKey.createdAt, apiKey.updatedAt]
   );
   return rowToKey(apiKey);
 }
@@ -134,24 +160,88 @@ export async function updateApiKey(id, data) {
     const now = new Date().toISOString();
     const tokenLimit = toNonNegativeInt(merged.tokenLimit);
     const resetHours = toNonNegativeInt(merged.resetHours);
+    const purchasedTokenLimit = toNonNegativeInt(merged.purchasedTokenLimit);
+    const usedPurchasedTokens = data.resetPurchasedUsage ? 0 : toNonNegativeInt(merged.usedPurchasedTokens);
+    const purchasedExpiresAt = normalizeDate(merged.purchasedExpiresAt);
     const expiresAt = normalizeDate(merged.expiresAt);
+    const comboName = normalizeOptionalString(merged.comboName);
+    const selectedModel = normalizeOptionalString(merged.selectedModel);
+    const skillIds = normalizeSkillIds(merged.skillIds);
     const usedTokens = data.resetUsage ? 0 : toNonNegativeInt(merged.usedTokens);
     const cycleStartedAt = data.resetUsage
       ? null
       : normalizeDate(merged.cycleStartedAt);
     db.run(
-      `UPDATE apiKeys SET key = ?, name = ?, machineId = ?, isActive = ?, tokenLimit = ?, resetHours = ?, usedTokens = ?, cycleStartedAt = ?, expiresAt = ?, updatedAt = ? WHERE id = ?`,
-      [merged.key, merged.name, merged.machineId, merged.isActive ? 1 : 0, tokenLimit, resetHours, usedTokens, cycleStartedAt, expiresAt, now, id]
+      `UPDATE apiKeys SET key = ?, name = ?, machineId = ?, isActive = ?, tokenLimit = ?, resetHours = ?, usedTokens = ?, purchasedTokenLimit = ?, usedPurchasedTokens = ?, purchasedExpiresAt = ?, cycleStartedAt = ?, comboName = ?, selectedModel = ?, skillIds = ?, expiresAt = ?, updatedAt = ? WHERE id = ?`,
+      [merged.key, merged.name, merged.machineId, merged.isActive ? 1 : 0, tokenLimit, resetHours, usedTokens, purchasedTokenLimit, usedPurchasedTokens, purchasedExpiresAt, cycleStartedAt, comboName, selectedModel, stringifyJson(skillIds), expiresAt, now, id]
     );
     result = rowToKey({
       ...merged,
       tokenLimit,
       resetHours,
       usedTokens,
+      purchasedTokenLimit,
+      usedPurchasedTokens,
+      purchasedExpiresAt,
       cycleStartedAt,
+      comboName,
+      selectedModel,
+      skillIds,
       expiresAt,
       updatedAt: now,
     });
+  });
+  return result;
+}
+
+function normalizeOptionalString(value) {
+  if (value === null || value === undefined) return null;
+  const normalized = String(value).trim();
+  return normalized || null;
+}
+
+export async function updateApiKeySelectedModelByKey(key, selectedModel) {
+  const normalizedKey = typeof key === "string" ? key.trim() : "";
+  const normalizedModel = normalizeOptionalString(selectedModel);
+  if (!normalizedKey) {
+    return { ok: false, status: "not_found", message: "API key is required" };
+  }
+
+  const db = await getAdapter();
+  let result = null;
+  db.transaction(() => {
+    let row = db.get(`SELECT * FROM apiKeys WHERE key = ?`, [normalizedKey]);
+    if (!row) {
+      result = { ok: false, status: "not_found", message: "Invalid API key" };
+      return;
+    }
+    row = resetCycleIfNeeded(db, row);
+    const apiKey = rowToKey(row);
+    const status = getKeyStatus(apiKey);
+    if (status !== "active") {
+      result = { ok: false, status, message: "API key is not active", key: apiKey };
+      return;
+    }
+    if (!apiKey.comboName) {
+      result = { ok: false, status: "no_combo", message: "This API key is not assigned to a combo", key: apiKey };
+      return;
+    }
+
+    const comboRow = db.get(`SELECT * FROM combos WHERE name = ?`, [apiKey.comboName]);
+    let models = [];
+    try {
+      models = comboRow?.models ? JSON.parse(comboRow.models) : [];
+    } catch {
+      models = [];
+    }
+    if (!models.includes(normalizedModel)) {
+      result = { ok: false, status: "invalid_model", message: "Selected model is not available for this API key", key: apiKey };
+      return;
+    }
+
+    const now = new Date().toISOString();
+    db.run(`UPDATE apiKeys SET selectedModel = ?, updatedAt = ? WHERE id = ?`, [normalizedModel, now, apiKey.id]);
+    result = { ok: true, key: rowToKey({ ...row, selectedModel: normalizedModel, updatedAt: now }) };
   });
   return result;
 }
@@ -224,6 +314,10 @@ export async function getApiKeyUsageSummaryByKey(key) {
 
   const tokenLimit = Number(apiKey.tokenLimit || 0);
   const usedTokens = Number(apiKey.usedTokens || 0);
+  const purchasedTokenLimit = Number(apiKey.purchasedTokenLimit || 0);
+  const usedPurchasedTokens = Number(apiKey.usedPurchasedTokens || 0);
+  const purchasedValid = !apiKey.purchasedExpiresAt || Date.now() < new Date(apiKey.purchasedExpiresAt).getTime();
+  const purchasedRemaining = purchasedValid ? Math.max(0, purchasedTokenLimit - usedPurchasedTokens) : 0;
   const resetAtMs = apiKey.resetAt ? new Date(apiKey.resetAt).getTime() : null;
   const resetInMs = resetAtMs ? Math.max(0, resetAtMs - Date.now()) : null;
 
@@ -237,10 +331,23 @@ export async function getApiKeyUsageSummaryByKey(key) {
       status === "quota_exceeded" ? "API key token quota exceeded" :
       "Invalid API key",
     key: apiKey,
+    combo: apiKey.comboName ? {
+      name: apiKey.comboName,
+      models: (() => {
+        const comboRow = db.get(`SELECT models FROM combos WHERE name = ?`, [apiKey.comboName]);
+        try { return comboRow?.models ? JSON.parse(comboRow.models) : []; } catch { return []; }
+      })(),
+      selectedModel: apiKey.selectedModel,
+    } : null,
+    suggestedModel: apiKey.selectedModel || apiKey.comboName || null,
     usage: {
       totalTokens: usedTokens,
       tokenLimit,
       remainingTokens: tokenLimit > 0 ? Math.max(0, tokenLimit - usedTokens) : null,
+      purchasedTokenLimit,
+      usedPurchasedTokens,
+      purchasedRemaining,
+      purchasedExpiresAt: apiKey.purchasedExpiresAt,
       quotaPercent: tokenLimit > 0 ? Math.min(100, Math.round((usedTokens / tokenLimit) * 100)) : null,
       promptTokens: Number(cycleUsageRow.promptTokens || 0),
       completionTokens: Number(cycleUsageRow.completionTokens || 0),
@@ -270,9 +377,23 @@ export async function recordApiKeyUsage(key, tokens) {
     if (!row) return;
     row = startCycleForApiCallIfNeeded(db, row);
     const now = new Date().toISOString();
-    const nextUsed = Number(row.usedTokens || 0) + amount;
-    db.run(`UPDATE apiKeys SET usedTokens = ?, updatedAt = ? WHERE id = ?`, [nextUsed, now, row.id]);
-    result = rowToKey({ ...row, usedTokens: nextUsed, updatedAt: now });
+    const baseLimit = Number(row.tokenLimit || 0);
+    const baseUsed = Number(row.usedTokens || 0);
+    const baseRemaining = Math.max(0, baseLimit - baseUsed);
+
+    const purchasedLimit = Number(row.purchasedTokenLimit || 0);
+    const purchasedUsed = Number(row.usedPurchasedTokens || 0);
+    const purchasedValid = !row.purchasedExpiresAt || Date.now() < new Date(row.purchasedExpiresAt).getTime();
+    const purchasedRemaining = purchasedValid ? Math.max(0, purchasedLimit - purchasedUsed) : 0;
+
+    const useFromBase = Math.min(amount, baseRemaining);
+    const useFromPurchased = Math.min(amount - useFromBase, purchasedRemaining);
+
+    const nextUsed = baseUsed + useFromBase;
+    const nextUsedPurchased = purchasedUsed + useFromPurchased;
+
+    db.run(`UPDATE apiKeys SET usedTokens = ?, usedPurchasedTokens = ?, updatedAt = ? WHERE id = ?`, [nextUsed, nextUsedPurchased, now, row.id]);
+    result = rowToKey({ ...row, usedTokens: nextUsed, usedPurchasedTokens: nextUsedPurchased, updatedAt: now });
   });
   return result;
 }

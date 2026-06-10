@@ -8,7 +8,7 @@ import {
   validateClientApiKey,
 } from "../services/auth.js";
 import { cacheClaudeHeaders } from "open-sse/utils/claudeHeaderCache.js";
-import { getSettings } from "@/lib/localDb";
+import { getComboByName, getSettings, getSkillById, getSkillBySlug } from "@/lib/localDb";
 import { getModelInfo, getComboModels } from "../services/model.js";
 import { handleChatCore } from "open-sse/handlers/chatCore.js";
 import { errorResponse, unavailableResponse } from "open-sse/utils/error.js";
@@ -19,6 +19,54 @@ import { detectFormatByEndpoint } from "open-sse/translator/formats.js";
 import * as log from "../utils/logger.js";
 import { updateProviderCredentials, checkAndRefreshToken } from "../services/tokenRefresh.js";
 import { getProjectIdForConnection } from "open-sse/services/projectId.js";
+
+function getRequestedSkillId(request, body) {
+  return String(
+    body.skill ||
+    body.skillId ||
+    body.skill_id ||
+    request?.headers?.get("x-9router-skill") ||
+    request?.headers?.get("x-skill") ||
+    ""
+  ).trim();
+}
+
+function prependSystemMessage(body, content) {
+  if (!content) return body;
+  const skillMessage = { role: "system", content };
+  if (Array.isArray(body.messages)) {
+    return { ...body, messages: [skillMessage, ...body.messages] };
+  }
+  if (typeof body.input === "string") {
+    return { ...body, input: `${content}\n\n${body.input}` };
+  }
+  if (Array.isArray(body.input)) {
+    return { ...body, input: [skillMessage, ...body.input] };
+  }
+  return body;
+}
+
+async function applyRequestedSkill({ request, body, keyValidation }) {
+  const requestedSkill = getRequestedSkillId(request, body);
+  if (!requestedSkill) return { ok: true, body };
+
+  if (!keyValidation?.valid) {
+    return { ok: false, status: HTTP_STATUS.UNAUTHORIZED, message: "API key is required to use skills" };
+  }
+
+  const skill = await getSkillById(requestedSkill) || await getSkillBySlug(requestedSkill);
+  if (!skill || !skill.isActive) {
+    return { ok: false, status: HTTP_STATUS.NOT_FOUND, message: "Skill not found" };
+  }
+
+  const allowedSkillIds = keyValidation.key?.skillIds || [];
+  if (!allowedSkillIds.includes(skill.id) && !allowedSkillIds.includes(skill.slug)) {
+    return { ok: false, status: HTTP_STATUS.FORBIDDEN, message: "Skill is not available for this API key" };
+  }
+
+  log.info("SKILL", `Applying skill: ${skill.slug || skill.id}`);
+  return { ok: true, body: prependSystemMessage(body, skill.instructions), skill };
+}
 
 /**
  * Handle chat completion request
@@ -47,7 +95,7 @@ export async function handleChat(request, clientRawRequest = null) {
 
   // Log request endpoint and model
   const url = new URL(request.url);
-  const modelStr = body.model;
+  let modelStr = body.model;
 
   // Count messages (support both messages[] and input[] formats)
   const msgCount = body.messages?.length || body.input?.length || 0;
@@ -67,16 +115,19 @@ export async function handleChat(request, clientRawRequest = null) {
 
   // Enforce API key if enabled in settings
   const settings = await getSettings();
+  let keyValidation = null;
+  if (apiKey) {
+    keyValidation = await validateClientApiKey(apiKey);
+  }
   if (settings.requireApiKey) {
     if (!apiKey) {
       log.warn("AUTH", "Missing API key (requireApiKey=true)");
       return errorResponse(HTTP_STATUS.UNAUTHORIZED, "Missing API key");
     }
-    const validation = await validateClientApiKey(apiKey);
-    if (!validation.valid) {
-      log.warn("AUTH", `${validation.message} (requireApiKey=true)`);
-      const status = validation.reason === "quota_exceeded" ? HTTP_STATUS.RATE_LIMITED : HTTP_STATUS.UNAUTHORIZED;
-      return errorResponse(status, validation.message || "Invalid API key");
+    if (!keyValidation?.valid) {
+      log.warn("AUTH", `${keyValidation?.message || "Invalid API key"} (requireApiKey=true)`);
+      const status = keyValidation?.reason === "quota_exceeded" ? HTTP_STATUS.RATE_LIMITED : HTTP_STATUS.UNAUTHORIZED;
+      return errorResponse(status, keyValidation?.message || "Invalid API key");
     }
   }
 
@@ -84,6 +135,34 @@ export async function handleChat(request, clientRawRequest = null) {
     log.warn("CHAT", "Missing model");
     return errorResponse(HTTP_STATUS.BAD_REQUEST, "Missing model");
   }
+
+  if (keyValidation?.valid && keyValidation.key?.comboName) {
+    const combo = await getComboByName(keyValidation.key.comboName);
+    const comboModels = combo?.models || [];
+    const selectedModel = keyValidation.key.selectedModel;
+
+    if (selectedModel) {
+      if (!comboModels.includes(selectedModel)) {
+        log.warn("AUTH", `Selected model is no longer in combo ${keyValidation.key.comboName}`);
+        return errorResponse(HTTP_STATUS.FORBIDDEN, "Selected model is not available for this API key");
+      }
+      if (modelStr !== selectedModel) {
+        log.info("AUTH", `API key model lock: ${modelStr} → ${selectedModel}`);
+      }
+      modelStr = selectedModel;
+      body = { ...body, model: selectedModel };
+    } else if (modelStr !== keyValidation.key.comboName && !comboModels.includes(modelStr)) {
+      log.warn("AUTH", `Model ${modelStr} is outside API key combo ${keyValidation.key.comboName}`);
+      return errorResponse(HTTP_STATUS.FORBIDDEN, "Model is not available for this API key");
+    }
+  }
+
+  const skillResult = await applyRequestedSkill({ request, body, keyValidation });
+  if (!skillResult.ok) {
+    log.warn("SKILL", skillResult.message);
+    return errorResponse(skillResult.status, skillResult.message);
+  }
+  body = skillResult.body;
 
   // Bypass naming/warmup requests before combo rotation to avoid wasting rotation slots
   const userAgent = request?.headers?.get("user-agent") || "";

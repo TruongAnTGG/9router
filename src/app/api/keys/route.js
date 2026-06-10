@@ -19,7 +19,7 @@ export async function GET() {
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { name, tokenLimit, resetHours, expiresAt } = body;
+    const { name, tokenLimit, resetHours, expiresAt, comboName, skillIds } = body;
 
     if (!name) {
       return NextResponse.json({ error: "Name is required" }, { status: 400 });
@@ -27,7 +27,7 @@ export async function POST(request) {
 
     // Always get machineId from server
     const machineId = await getConsistentMachineId();
-    const apiKey = await createApiKey(name, machineId, { tokenLimit, resetHours, expiresAt });
+    const apiKey = await createApiKey(name, machineId, { tokenLimit, resetHours, expiresAt, comboName, skillIds });
 
     return NextResponse.json({
       key: apiKey.key,
@@ -39,6 +39,9 @@ export async function POST(request) {
       usedTokens: apiKey.usedTokens,
       cycleStartedAt: apiKey.cycleStartedAt,
       resetAt: apiKey.resetAt,
+      comboName: apiKey.comboName,
+      selectedModel: apiKey.selectedModel,
+      skillIds: apiKey.skillIds,
       expiresAt: apiKey.expiresAt,
     }, { status: 201 });
   } catch (error) {

@@ -1,5 +1,5 @@
 // Latest schema version — bumped when a migration is added in ./migrations/
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 3;
 
 export const PRAGMA_SQL = `
 PRAGMA journal_mode = WAL;
@@ -81,12 +81,28 @@ export const TABLES = {
       tokenLimit: "INTEGER DEFAULT 0",
       resetHours: "INTEGER DEFAULT 0",
       usedTokens: "INTEGER DEFAULT 0",
+      purchasedTokenLimit: "INTEGER DEFAULT 0",
+      usedPurchasedTokens: "INTEGER DEFAULT 0",
+      purchasedExpiresAt: "TEXT",
       cycleStartedAt: "TEXT",
+      comboName: "TEXT",
+      selectedModel: "TEXT",
+      skillIds: "TEXT",
       expiresAt: "TEXT",
       createdAt: "TEXT NOT NULL",
       updatedAt: "TEXT",
     },
     indexes: ["CREATE INDEX IF NOT EXISTS idx_ak_key ON apiKeys(key)"],
+  },
+  skills: {
+    columns: {
+      id: "TEXT PRIMARY KEY",
+      isActive: "INTEGER DEFAULT 1",
+      data: "TEXT NOT NULL",
+      createdAt: "TEXT NOT NULL",
+      updatedAt: "TEXT NOT NULL",
+    },
+    indexes: ["CREATE INDEX IF NOT EXISTS idx_skills_active ON skills(isActive)"],
   },
   customerLeads: {
     columns: {
@@ -173,6 +189,47 @@ export const TABLES = {
       "CREATE INDEX IF NOT EXISTS idx_rd_provider ON requestDetails(provider)",
       "CREATE INDEX IF NOT EXISTS idx_rd_model ON requestDetails(model)",
       "CREATE INDEX IF NOT EXISTS idx_rd_conn ON requestDetails(connectionId)",
+    ],
+  },
+  tokenPackages: {
+    columns: {
+      id: "TEXT PRIMARY KEY",
+      name: "TEXT NOT NULL",
+      description: "TEXT",
+      tokenAmount: "INTEGER NOT NULL",
+      price: "REAL NOT NULL",
+      currency: "TEXT DEFAULT 'VND'",
+      isActive: "INTEGER DEFAULT 1",
+      displayOrder: "INTEGER DEFAULT 0",
+      features: "TEXT",
+      createdAt: "TEXT NOT NULL",
+      updatedAt: "TEXT NOT NULL",
+    },
+    indexes: [
+      "CREATE INDEX IF NOT EXISTS idx_tp_active ON tokenPackages(isActive, displayOrder)",
+    ],
+  },
+  orders: {
+    columns: {
+      id: "TEXT PRIMARY KEY",
+      apiKeyId: "TEXT NOT NULL",
+      packageId: "TEXT NOT NULL",
+      packageName: "TEXT NOT NULL",
+      tokenAmount: "INTEGER NOT NULL",
+      price: "REAL NOT NULL",
+      currency: "TEXT DEFAULT 'VND'",
+      status: "TEXT DEFAULT 'pending'",
+      paymentMethod: "TEXT",
+      paymentTransactionId: "TEXT",
+      paymentData: "TEXT",
+      createdAt: "TEXT NOT NULL",
+      updatedAt: "TEXT NOT NULL",
+      completedAt: "TEXT",
+    },
+    indexes: [
+      "CREATE INDEX IF NOT EXISTS idx_orders_apikey ON orders(apiKeyId)",
+      "CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)",
+      "CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(createdAt DESC)",
     ],
   },
 };

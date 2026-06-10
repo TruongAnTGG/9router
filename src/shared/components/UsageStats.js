@@ -38,35 +38,52 @@ function TimeAgo({ timestamp }) {
 }
 
 function RecentRequests({ requests = [] }) {
+  const [showAll, setShowAll] = useState(false);
+  const recentItems = showAll ? requests : requests.slice(0, 20);
+  const hasMore = requests.length > 20;
+
   return (
-    <Card className="flex min-w-0 flex-col overflow-hidden" padding="sm" style={{ height: 480 }}>
+    <Card className="flex min-w-0 flex-col overflow-hidden" padding="sm">
       {/* Header */}
-      <div className="px-1 py-2 border-b border-border shrink-0">
+      <div className="flex items-center justify-between gap-3 px-1 py-2 border-b border-border shrink-0">
         <span className="text-xs font-semibold text-text-muted uppercase tracking-wide">Recent Requests</span>
+        {hasMore && (
+          <button
+            type="button"
+            onClick={() => setShowAll((value) => !value)}
+            className="text-xs font-medium text-primary transition-colors hover:text-primary/80"
+          >
+            {showAll ? "Show less" : `Show all (${requests.length})`}
+          </button>
+        )}
       </div>
 
-      {!requests.length ? (
+      {!recentItems.length ? (
         <div className="flex-1 flex items-center justify-center text-text-muted text-sm">No requests yet.</div>
       ) : (
-        <div className="flex-1 overflow-y-auto">
-          <table className="w-full min-w-[300px] border-collapse text-xs">
+        <div className="flex-1 overflow-auto">
+          <table className="w-full min-w-[640px] border-collapse text-xs sm:text-sm">
             <thead className="sticky top-0 bg-bg z-10">
               <tr className="border-b border-border">
                 <th className="py-1.5 text-left font-semibold text-text-muted w-2"></th>
                 <th className="py-1.5 text-left font-semibold text-text-muted">Model</th>
+                <th className="w-[140px] py-1.5 text-left font-semibold text-text-muted">API Key</th>
                 <th className="py-1.5 text-right font-semibold text-text-muted whitespace-nowrap">In / Out</th>
                 <th className="py-1.5 text-right font-semibold text-text-muted">When</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/50">
-              {requests.map((r, i) => {
+              {recentItems.map((r, i) => {
                 const ok = !r.status || r.status === "ok" || r.status === "success";
                 return (
                   <tr key={i} className="hover:bg-bg-subtle transition-colors">
                     <td className="py-1.5">
                       <span className={`block w-1.5 h-1.5 rounded-full ${ok ? "bg-success" : "bg-error"}`} />
                     </td>
-                    <td className="py-1.5 font-mono truncate max-w-[120px]" title={r.model}>{r.model}</td>
+                    <td className="py-1.5 pr-3 font-mono break-all" title={r.model}>{r.model}</td>
+                    <td className="w-[140px] max-w-[140px] py-1.5 pr-3" title={r.keyName || r.apiKey || "Local (No API Key)"}>
+                      <div className="truncate">{r.keyName || r.apiKey || "Local (No API Key)"}</div>
+                    </td>
                     <td className="py-1.5 text-right whitespace-nowrap">
                       <span className="text-primary">{fmt(r.promptTokens)}↑</span>
                       {" "}
@@ -435,14 +452,18 @@ export default function UsageStats({ period: periodProp, setPeriod: setPeriodPro
 
       {/* Provider topology + Recent Requests */}
       {loading ? spinner : (
-        <div className="grid min-w-0 grid-cols-1 items-stretch gap-2 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
-          <ProviderTopology
-            providers={providers}
-            activeRequests={stats.activeRequests || []}
-            lastProvider={stats.recentRequests?.[0]?.provider || ""}
-            errorProvider={stats.errorProvider || ""}
-          />
-          <RecentRequests requests={stats.recentRequests || []} />
+        <div className="grid min-w-0 grid-cols-1 items-stretch gap-4 xl:grid-cols-2">
+          <div className="min-w-0">
+            <ProviderTopology
+              providers={providers}
+              activeRequests={stats.activeRequests || []}
+              lastProvider={stats.recentRequests?.[0]?.provider || ""}
+              errorProvider={stats.errorProvider || ""}
+            />
+          </div>
+          <div className="min-w-0">
+            <RecentRequests requests={stats.recentRequests || []} />
+          </div>
         </div>
       )}
 

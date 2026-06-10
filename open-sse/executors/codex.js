@@ -86,6 +86,8 @@ export class CodexExecutor extends BaseExecutor {
   buildHeaders(credentials, stream = true) {
     const headers = super.buildHeaders(credentials, stream);
     headers["session_id"] = this._currentSessionId || credentials?.connectionId || "default";
+    const accountId = credentials?.providerSpecificData?.chatgptAccountId;
+    if (accountId) headers["chatgpt-account-id"] = accountId;
     return headers;
   }
 

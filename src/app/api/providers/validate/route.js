@@ -338,6 +338,7 @@ export async function POST(request) {
         case "deepseek":
         case "groq":
         case "xai":
+        case "xai-build":
         case "mistral":
         case "perplexity":
         case "together":
@@ -358,6 +359,7 @@ export async function POST(request) {
             deepseek: "https://api.deepseek.com/models",
             groq: "https://api.groq.com/openai/v1/models",
             xai: "https://api.x.ai/v1/models",
+            "xai-build": "https://api.x.ai/v1/models",
             mistral: "https://api.mistral.ai/v1/models",
             perplexity: "https://api.perplexity.ai/models",
             together: "https://api.together.xyz/v1/models",
@@ -379,7 +381,7 @@ export async function POST(request) {
           if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
           const res = await fetch(endpoints[provider], { headers });
           // xai returns 400 for bad key, 403 for valid-but-no-credit. Other providers use 401.
-          if (provider === "xai") {
+          if (provider === "xai" || provider === "xai-build") {
             isValid = res.status === 200 || res.status === 403;
           } else {
             isValid = res.ok;

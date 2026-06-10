@@ -23,6 +23,11 @@ Commands:
   logs         Follow container logs
   status       Show container status
   reset        Remove container and data volume (requires --yes)
+  ppt-deploy   Build and start/recreate PPT image service container
+  ppt-restart  Restart PPT image service container
+  ppt-stop     Stop PPT image service container
+  ppt-logs     Follow PPT image service logs
+  ppt-status   Show PPT image service status
   help         Show this help
 
 Options:
@@ -35,8 +40,15 @@ Environment overrides:
   DATA_VOLUME=9router-data
   ENV_FILE=.env
 
+PPT Image Service overrides:
+  PPT_IMAGE_APP_NAME=9router-ppt-image-service
+  PPT_IMAGE_IMAGE_NAME=9router-ppt-image-service:latest
+  PPT_IMAGE_PORT=20228
+  PPT_IMAGE_ENV_FILE=.env.ppt-image-service
+
 Examples:
   ./run.sh deploy
+  ./run.sh ppt-deploy
   ./run.sh update
   ./run.sh reset --yes
 EOF
@@ -175,6 +187,12 @@ reset_all() {
   fi
 }
 
+run_ppt_image_service() {
+  local ppt_command="$1"
+  shift || true
+  "$ROOT_DIR/services/ppt-image-service/run.sh" "$ppt_command" "$@"
+}
+
 main() {
   cd "$ROOT_DIR"
 
@@ -203,6 +221,11 @@ main() {
     logs) logs ;;
     status) status ;;
     reset) reset_all ;;
+    ppt-deploy) run_ppt_image_service deploy ;;
+    ppt-restart) run_ppt_image_service restart ;;
+    ppt-stop) run_ppt_image_service stop ;;
+    ppt-logs) run_ppt_image_service logs ;;
+    ppt-status) run_ppt_image_service status ;;
     help|-h|--help) usage ;;
     *) usage; die "Unknown command: $command" ;;
   esac

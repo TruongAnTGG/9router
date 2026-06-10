@@ -102,3 +102,42 @@ git tag v0.4.x && git push origin v0.4.x
 ```
 
 Workflow: `app/.github/workflows/docker-publish.yml`
+
+## PPT Image Service
+
+A separate helper container can generate slide artwork from PPTX text by calling a media text-to-image endpoint.
+
+```bash
+cp services/ppt-image-service/.env.example services/ppt-image-service/.env.ppt-image-service
+./run.sh ppt-deploy
+```
+
+Open UI: http://localhost:20228/
+
+Management commands: `./run.sh ppt-status`, `./run.sh ppt-logs`, `./run.sh ppt-restart`, `./run.sh ppt-stop`.
+
+Default API:
+
+```bash
+curl -X POST http://localhost:20228/v1/pptx/slide-images \
+  -H 'Content-Type: application/json' \
+  -d '{"slides":[{"index":1,"text":"AI agent platform for sales teams"}],"model":"openai/gpt-image-1"}'
+```
+
+To send a PPTX, encode it as base64 and post `pptx_base64`. The service extracts `ppt/slides/slide*.xml`, builds one image prompt per slide, and returns the image provider response for each slide.
+
+Direct PPTX upload is also supported:
+
+```bash
+curl -X POST http://localhost:20228/v1/pptx/slide-images \
+  -F pptx=@deck.pptx \
+  -F model=openai/gpt-image-1 \
+  -F continue_on_error=true
+```
+
+Important env vars:
+
+- `MEDIA_PROVIDER_BASE_URL`: OpenAI-compatible image endpoint, default `http://host.docker.internal:20128/v1/images/generations`.
+- `MEDIA_PROVIDER_API_KEY`: optional bearer token when 9router requires API key.
+- `MEDIA_PROVIDER_MODEL`: default image model, default `openai/gpt-image-1`.
+- `MEDIA_IMAGE_SIZE`: default image size, default `1792x1024`.

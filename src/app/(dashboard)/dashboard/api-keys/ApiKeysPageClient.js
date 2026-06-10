@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Card, Button, Input, Modal, CardSkeleton, Toggle, ConfirmModal, Select } from "@/shared/components";
 import { useCopyToClipboard } from "@/shared/hooks/useCopyToClipboard";
 
@@ -14,6 +15,7 @@ const CLI_TOOL_OPTIONS = [
 export default function ApiKeysPageClient() {
   const [keys, setKeys] = useState([]);
   const [combos, setCombos] = useState([]);
+  const [skills, setSkills] = useState([]);
   const [loading, setLoading] = useState(true);
   const [requireApiKey, setRequireApiKey] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -21,11 +23,15 @@ export default function ApiKeysPageClient() {
   const [newKeyTokenLimit, setNewKeyTokenLimit] = useState("");
   const [newKeyResetHours, setNewKeyResetHours] = useState("");
   const [newKeyExpiresAt, setNewKeyExpiresAt] = useState("");
+  const [newKeyComboName, setNewKeyComboName] = useState("");
+  const [newKeySkillIds, setNewKeySkillIds] = useState([]);
   const [editingKey, setEditingKey] = useState(null);
   const [editKeyName, setEditKeyName] = useState("");
   const [editKeyTokenLimit, setEditKeyTokenLimit] = useState("");
   const [editKeyResetHours, setEditKeyResetHours] = useState("");
   const [editKeyExpiresAt, setEditKeyExpiresAt] = useState("");
+  const [editKeyComboName, setEditKeyComboName] = useState("");
+  const [editKeySkillIds, setEditKeySkillIds] = useState([]);
   const [editKeyResetUsage, setEditKeyResetUsage] = useState(false);
   const [createdKey, setCreatedKey] = useState(null);
   const [createdKeyMeta, setCreatedKeyMeta] = useState(null);
@@ -55,10 +61,11 @@ export default function ApiKeysPageClient() {
   const loadPage = useCallback(async () => {
     setLoading(true);
     try {
-      const [keysRes, settingsRes, combosRes] = await Promise.all([
+      const [keysRes, settingsRes, combosRes, skillsRes] = await Promise.all([
         fetch("/api/keys", { cache: "no-store" }),
         fetch("/api/settings", { cache: "no-store" }),
         fetch("/api/combos", { cache: "no-store" }),
+        fetch("/api/skills", { cache: "no-store" }),
       ]);
       if (keysRes.ok) {
         const data = await keysRes.json();
@@ -71,6 +78,10 @@ export default function ApiKeysPageClient() {
       if (combosRes.ok) {
         const data = await combosRes.json();
         setCombos((data.combos || []).filter((combo) => !combo.kind));
+      }
+      if (skillsRes.ok) {
+        const data = await skillsRes.json();
+        setSkills(data.skills || []);
       }
     } catch (error) {
       console.log("Error loading API keys:", error);
@@ -112,13 +123,16 @@ export default function ApiKeysPageClient() {
           tokenLimit: newKeyTokenLimit,
           resetHours: newKeyResetHours,
           expiresAt: newKeyExpiresAt,
+          comboName: newKeyComboName,
+          skillIds: newKeySkillIds,
         }),
       });
       const data = await res.json();
 
       if (res.ok) {
         setCreatedKey(data.key);
-        setCreatedKeyMeta({ id: data.id, name: data.name });
+        setCreatedKeyMeta({ id: data.id, name: data.name, comboName: data.comboName, selectedModel: data.selectedModel, skillIds: data.skillIds || [] });
+        setSelectedConfigModel(data.comboName || "");
         setIsNewKeyConfig(true);
         await loadPage();
         resetCreateForm();
@@ -134,6 +148,8 @@ export default function ApiKeysPageClient() {
     setNewKeyTokenLimit("");
     setNewKeyResetHours("");
     setNewKeyExpiresAt("");
+    setNewKeyComboName("");
+    setNewKeySkillIds([]);
   };
 
   const openEditKey = (key) => {
@@ -142,6 +158,8 @@ export default function ApiKeysPageClient() {
     setEditKeyTokenLimit(key.tokenLimit ? String(key.tokenLimit) : "");
     setEditKeyResetHours(key.resetHours ? String(key.resetHours) : "");
     setEditKeyExpiresAt(key.expiresAt ? toDateTimeLocal(key.expiresAt) : "");
+    setEditKeyComboName(key.comboName || "");
+    setEditKeySkillIds(key.skillIds || []);
     setEditKeyResetUsage(false);
   };
 
@@ -151,6 +169,8 @@ export default function ApiKeysPageClient() {
     setEditKeyTokenLimit("");
     setEditKeyResetHours("");
     setEditKeyExpiresAt("");
+    setEditKeyComboName("");
+    setEditKeySkillIds([]);
     setEditKeyResetUsage(false);
   };
 
@@ -165,6 +185,9 @@ export default function ApiKeysPageClient() {
           tokenLimit: editKeyTokenLimit,
           resetHours: editKeyResetHours,
           expiresAt: editKeyExpiresAt,
+          comboName: editKeyComboName,
+          selectedModel: editKeyComboName === editingKey.comboName ? editingKey.selectedModel : "",
+          skillIds: editKeySkillIds,
           resetUsage: editKeyResetUsage,
         }),
       });
@@ -237,8 +260,14 @@ export default function ApiKeysPageClient() {
     value: combo.name,
     label: combo.name,
   })), [combos]);
+  const comboOptions = useMemo(() => [
+    { value: "__none__", label: "No combo package" },
+    ...modelOptions,
+  ], [modelOptions]);
 
-  const selectedModelForConfig = selectedConfigModel || modelOptions[0]?.value || "provider/model-id";
+  const skillNameMap = useMemo(() => new Map(skills.map((skill) => [skill.id, skill.name || skill.slug || skill.id])), [skills]);
+
+  const selectedModelForConfig = selectedConfigModel || createdKeyMeta?.selectedModel || createdKeyMeta?.comboName || modelOptions[0]?.value || "provider/model-id";
 
   const createdKeyConfigs = useMemo(() => {
     if (!createdKey) return [];
@@ -276,7 +305,8 @@ export default function ApiKeysPageClient() {
 
   const openConfigForKey = (key) => {
     setCreatedKey(key.key);
-    setCreatedKeyMeta({ id: key.id, name: key.name });
+    setCreatedKeyMeta({ id: key.id, name: key.name, comboName: key.comboName, selectedModel: key.selectedModel });
+    setSelectedConfigModel(key.selectedModel || key.comboName || "");
     setIsNewKeyConfig(false);
   };
 
@@ -326,9 +356,16 @@ export default function ApiKeysPageClient() {
             </h2>
             <p className="mt-1 text-sm text-text-muted">Create client keys, pause access, and enforce token budgets.</p>
           </div>
-          <Button icon="add" onClick={() => setShowAddModal(true)}>
-            Create Key
-          </Button>
+          <div className="flex items-center gap-2">
+            <Link href="/dashboard/buy-tokens">
+              <Button icon="shopping_cart" variant="secondary">
+                Buy Tokens
+              </Button>
+            </Link>
+            <Button icon="add" onClick={() => setShowAddModal(true)}>
+              Create Key
+            </Button>
+          </div>
         </div>
 
         {keys.length === 0 ? (
@@ -382,6 +419,9 @@ export default function ApiKeysPageClient() {
                     </div>
                     <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-muted mt-1">
                       <span>Created {new Date(key.createdAt).toLocaleDateString()}</span>
+                      <span>Combo: {key.comboName || "None"}</span>
+                      {key.selectedModel ? <span>Selected model: {key.selectedModel}</span> : null}
+                      <span>Skills: {(key.skillIds || []).length ? key.skillIds.map((id) => skillNameMap.get(id) || id).join(", ") : "None"}</span>
                       <span>Reset: {key.resetHours > 0 ? `${key.resetHours}h${key.resetAt ? `, ${new Date(key.resetAt).toLocaleString()}` : ""}` : "Manual"}</span>
                       <span>Expires: {key.expiresAt ? new Date(key.expiresAt).toLocaleString() : "Never"}</span>
                     </div>
@@ -496,6 +536,18 @@ export default function ApiKeysPageClient() {
             onChange={(e) => setNewKeyExpiresAt(e.target.value)}
             hint="Leave empty for no expiration"
           />
+          <Select
+            label="Combo package"
+            value={newKeyComboName || "__none__"}
+            onChange={(e) => setNewKeyComboName(e.target.value === "__none__" ? "" : e.target.value)}
+            options={comboOptions}
+            hint="Customers can choose one model from this combo on the quota check page"
+          />
+          <SkillPicker
+            skills={skills}
+            selectedIds={newKeySkillIds}
+            onChange={setNewKeySkillIds}
+          />
           <div className="flex gap-2">
             <Button onClick={handleCreateKey} fullWidth disabled={!newKeyName.trim()}>
               Create
@@ -543,6 +595,18 @@ export default function ApiKeysPageClient() {
             value={editKeyExpiresAt}
             onChange={(e) => setEditKeyExpiresAt(e.target.value)}
             hint="Leave empty for no expiration"
+          />
+          <Select
+            label="Combo package"
+            value={editKeyComboName || "__none__"}
+            onChange={(e) => setEditKeyComboName(e.target.value === "__none__" ? "" : e.target.value)}
+            options={comboOptions}
+            hint="Changing the combo clears the customer's selected model"
+          />
+          <SkillPicker
+            skills={skills}
+            selectedIds={editKeySkillIds}
+            onChange={setEditKeySkillIds}
           />
           {editingKey && (
             <div className="rounded-lg border border-border bg-surface-2 p-3">
@@ -734,6 +798,48 @@ export default function ApiKeysPageClient() {
 
 function trimTrailingSlash(baseUrl) {
   return String(baseUrl || "http://localhost:20128").replace(/\/+$/, "");
+}
+
+function SkillPicker({ skills, selectedIds, onChange }) {
+  const toggleSkill = (skillId) => {
+    onChange(
+      selectedIds.includes(skillId)
+        ? selectedIds.filter((id) => id !== skillId)
+        : [...selectedIds, skillId]
+    );
+  };
+
+  return (
+    <div className="rounded-lg border border-border bg-surface-2 p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-medium text-text-main">Allowed skills</p>
+          <p className="text-xs text-text-muted">Users can only apply selected skills with this API key.</p>
+        </div>
+        <span className="rounded-full bg-surface px-2 py-0.5 text-xs text-text-muted">{selectedIds.length} selected</span>
+      </div>
+      {skills.length === 0 ? (
+        <p className="mt-3 text-xs text-text-muted">No skills yet. Create skills in Dashboard → Skills.</p>
+      ) : (
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          {skills.map((skill) => (
+            <label key={skill.id} className="flex cursor-pointer items-start gap-2 rounded-lg border border-border bg-surface p-2 text-sm hover:border-primary/50">
+              <input
+                type="checkbox"
+                checked={selectedIds.includes(skill.id)}
+                onChange={() => toggleSkill(skill.id)}
+                className="mt-0.5 h-4 w-4"
+              />
+              <span className="min-w-0">
+                <span className="block truncate font-medium text-text-main">{skill.name || skill.slug}</span>
+                <span className="block truncate text-xs text-text-muted">{skill.slug || skill.id}</span>
+              </span>
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function withV1(baseUrl) {

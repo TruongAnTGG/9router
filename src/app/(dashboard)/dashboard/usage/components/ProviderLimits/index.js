@@ -8,6 +8,7 @@ import { parseQuotaData, calculatePercentage } from "./utils";
 import Card from "@/shared/components/Card";
 import { EditConnectionModal } from "@/shared/components";
 import { USAGE_SUPPORTED_PROVIDERS, USAGE_APIKEY_PROVIDERS } from "@/shared/constants/providers";
+import ComboModelsModal from "./ComboModelsModal";
 
 // Connection is eligible for the quota page when it uses OAuth or is an apikey provider whitelisted for quota
 const isUsageEligible = (conn) =>
@@ -41,6 +42,7 @@ export default function ProviderLimits() {
   const [expiringFirst, setExpiringFirst] = useState(false);
   const [providerMenuOpen, setProviderMenuOpen] = useState(false);
   const [bulkToggling, setBulkToggling] = useState(false);
+  const [showComboModelsModal, setShowComboModelsModal] = useState(false);
 
   const intervalRef = useRef(null);
   const countdownRef = useRef(null);
@@ -550,6 +552,16 @@ export default function ProviderLimits() {
           </div>
           <button
             type="button"
+            onClick={() => setShowComboModelsModal(true)}
+            className="flex h-8 shrink-0 items-center gap-1 rounded-lg border border-black/10 px-2 text-xs text-text-primary transition-colors hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/5"
+            title="Choose models for configured combos"
+          >
+            <span className="material-symbols-outlined text-[14px]">layers</span>
+            <span className="hidden sm:inline">Combo Models</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setExpiringFirst((prev) => !prev)}
             className={`flex h-8 shrink-0 items-center gap-1 rounded-lg border px-2 text-xs transition-colors ${expiringFirst ? "border-amber-500/40 bg-amber-500/10 text-amber-500" : "border-black/10 text-text-primary hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/5"}`}
             title="Sort accounts by earliest quota reset time"
@@ -757,6 +769,12 @@ export default function ProviderLimits() {
           setShowEditModal(false);
           setSelectedConnection(null);
         }}
+      />
+
+      <ComboModelsModal
+        isOpen={showComboModelsModal}
+        onClose={() => setShowComboModelsModal(false)}
+        activeProviders={connections}
       />
     </div>
   );

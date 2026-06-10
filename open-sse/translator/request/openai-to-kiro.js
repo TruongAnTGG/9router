@@ -6,6 +6,61 @@ import { register } from "../index.js";
 import { FORMATS } from "../formats.js";
 import { v4 as uuidv4 } from "uuid";
 
+const DEFAULT_MAX_PAYLOAD_CHARS = 180000;
+const TRUNCATION_NOTICE = "\n\n[9router: older context was truncated because Kiro rejected oversized input.]";
+
+function getMaxPayloadChars() {
+  const raw = Number(process.env.KIRO_MAX_PAYLOAD_CHARS);
+  return Number.isFinite(raw) && raw > 10000 ? raw : DEFAULT_MAX_PAYLOAD_CHARS;
+}
+
+function getMessageContentRef(item) {
+  if (item?.userInputMessage) return item.userInputMessage;
+  if (item?.assistantResponseMessage) return item.assistantResponseMessage;
+  return null;
+}
+
+function payloadLength(payload) {
+  return JSON.stringify(payload).length;
+}
+
+function truncateTextMiddle(text, maxLength) {
+  if (typeof text !== "string" || text.length <= maxLength) return text;
+  if (maxLength <= TRUNCATION_NOTICE.length + 64) return text.slice(-maxLength);
+  const keep = maxLength - TRUNCATION_NOTICE.length;
+  const head = Math.floor(keep * 0.35);
+  const tail = keep - head;
+  return `${text.slice(0, head)}${TRUNCATION_NOTICE}${text.slice(-tail)}`;
+}
+
+function trimKiroPayload(payload, maxPayloadChars = getMaxPayloadChars()) {
+  if (!payload || payloadLength(payload) <= maxPayloadChars) return payload;
+
+  const state = payload.conversationState;
+  if (!state) return payload;
+
+  while (state.history?.length > 0 && payloadLength(payload) > maxPayloadChars) {
+    state.history.shift();
+  }
+
+  const currentContent = state.currentMessage?.userInputMessage?.content;
+  if (typeof currentContent === "string" && payloadLength(payload) > maxPayloadChars) {
+    const overflow = payloadLength(payload) - maxPayloadChars;
+    const targetLength = Math.max(4000, currentContent.length - overflow - 2000);
+    state.currentMessage.userInputMessage.content = truncateTextMiddle(currentContent, targetLength);
+  }
+
+  if (payloadLength(payload) <= maxPayloadChars) return payload;
+
+  for (let i = state.history?.length - 1 || 0; i >= 0 && payloadLength(payload) > maxPayloadChars; i--) {
+    const contentRef = getMessageContentRef(state.history[i]);
+    if (!contentRef || typeof contentRef.content !== "string") continue;
+    contentRef.content = truncateTextMiddle(contentRef.content, 12000);
+  }
+
+  return payload;
+}
+
 /**
  * Convert OpenAI messages to Kiro format
  * Rules: system/tool/user -> user role, merge consecutive same roles
@@ -327,7 +382,9 @@ export function buildKiroPayload(model, body, stream, credentials) {
     if (topP !== undefined) payload.inferenceConfig.topP = topP;
   }
 
-  return payload;
+  return trimKiroPayload(payload);
 }
 
 register(FORMATS.OPENAI, FORMATS.KIRO, buildKiroPayload, null);
+
+export { trimKiroPayload };

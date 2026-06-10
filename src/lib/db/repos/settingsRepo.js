@@ -77,6 +77,11 @@ const DEFAULT_SETTINGS = {
   landingContactUrl: "",
   landingContactCtaLabel: "Contact sales",
   landingPricingPlans: DEFAULT_LANDING_PRICING_PLANS,
+  paymentBankEnabled: false,
+  paymentBankCode: "",
+  paymentBankAccountNumber: "",
+  paymentBankAccountName: "",
+  paymentBankNotePrefix: "9ROUTER",
 };
 
 async function readRaw() {

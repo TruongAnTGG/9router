@@ -450,6 +450,9 @@ export const PROVIDER_MODELS = {
     { id: "grok-code-fast-1", name: "Grok Code Fast" },
     { id: "grok-3", name: "Grok 3" },
   ],
+  "xai-build": [
+    { id: "grok-build-0.1", name: "Grok Build 0.1" },
+  ],
   mistral: [
     { id: "mistral-large-latest", name: "Mistral Large 3" },
     { id: "codestral-latest", name: "Codestral" },
@@ -857,6 +860,7 @@ const OAUTH_ALIASES = {
   opencode: "oc",
   vertex: "vertex",
   "vertex-partner": "vertex-partner",
+  "xai-build": "xai-build",
 };
 
 // Derived from PROVIDERS — no need to maintain manually
